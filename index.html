@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login - Hussain Son's Pharmacy POS &amp; Management System</title>
+<!-- Load Tailwind CSS v3 with forms plugin -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'brand-navy': '#0e2439',
+            'brand-navy-dark': '#0b1d2e',
+            'brand-green': '#199946',
+            'brand-green-hover': '#15853c',
+            'brand-border': '#15324d',
+            'text-title': '#0e2338',
+            'input-bg': '#f4f6f8',
+          },
+          fontFamily: {
+            sans: ['Segoe UI', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout">
+    /* Precise custom styling matching screenshot */
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-white antialiased">
+<!-- BEGIN: MainContainer -->
+<main class="min-h-screen w-full flex flex-col lg:flex-row">
+<!-- BEGIN: LeftBrandingPanel -->
+<section class="w-full lg:w-1/2 min-h-screen bg-[#fbfbfd] flex flex-col items-center justify-center px-8 py-16 text-center select-none" data-purpose="branding-display">
+<!-- Brand Logo Container -->
+<div class="mb-10 w-72 h-72 sm:w-80 sm:h-80 relative flex items-center justify-center" data-purpose="brand-logo">
+<svg class="w-full h-full drop-shadow-sm" fill="none" viewbox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+<!-- Outer border circle -->
+<circle cx="160" cy="160" fill="#ffffff" r="148" stroke="#0e3a53" stroke-width="6"></circle>
+<!-- Inner ring -->
+<circle cx="160" cy="160" r="139" stroke="#169a47" stroke-width="1.8"></circle>
+<!-- Cross & Bowl / Snake Emblem -->
+<g transform="translate(160, 115) scale(0.95)">
+<!-- Green Medical Cross -->
+<path d="M-13 -68 H13 V-42 H39 V-16 H13 V10 H-13 V-16 H-39 V-42 H-13 Z" fill="#1b9d4e"></path>
+<!-- Inner cross cut / subtle detail -->
+<path d="M-9 -64 H9 V-46 H27 V-28 H9 V-10 H-9 V-28 H-27 V-46 H-9 Z" fill="#15823e" opacity="0.15"></path>
+<!-- Bowl of Hygieia (Dark Teal) -->
+<path d="M -54 -10 C -52 30, 52 30, 54 -10 C 36 -12, -36 -12, -54 -10 Z" fill="#0e3b52"></path>
+<!-- Bowl Stem and Base -->
+<path d="M -7 18 L -9 46 L -24 49 C -24 53, 24 53, 24 49 L 9 46 L 7 18 Z" fill="#0e3b52"></path>
+<!-- Snake / Caduceus / Medicinal Plant (Green) winding up the stem -->
+<path d="M -2 -14 C -12 -12 -28 6 -15 21 C -4 34 18 20 16 12 C 14 5 -4 4 -1 15 C 3 24 -12 28 -12 28" fill="none" stroke="#1cad53" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"></path>
+<path d="M -48 -18 C -64 12 -42 28 -34 26 C -30 25 -34 8 -48 -18 Z" fill="#1cad53"></path>
+</g>
+<!-- Text: HUSSAIN -->
+<text fill="#0e3550" font-family="'Segoe UI', Arial, sans-serif" font-size="28" font-weight="900" letter-spacing="1.5" text-anchor="middle" x="160" y="200">HUSSAIN</text>
+<!-- Flanking horizontal lines for SON'S -->
+<line stroke="#169a47" stroke-linecap="round" stroke-width="2.5" x1="56" x2="105" y1="214" y2="214"></line>
+<text fill="#169a47" font-family="'Segoe UI', Arial, sans-serif" font-size="16.5" font-weight="800" letter-spacing="3.5" text-anchor="middle" x="160" y="220">SON'S</text>
+<line stroke="#169a47" stroke-linecap="round" stroke-width="2.5" x1="215" x2="264" y1="214" y2="214"></line>
+<!-- PHARMACY Subtitle -->
+<text fill="#0e3550" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="4.5" text-anchor="middle" x="160" y="238">PHARMACY</text>
+<!-- Motto -->
+<text fill="#4d6274" font-family="'Segoe UI', Arial, sans-serif" font-size="7.5" font-weight="600" letter-spacing="1.8" text-anchor="middle" x="160" y="253">YOUR HEALTH, OUR CARE</text>
+<!-- Pulse / Heartbeat Ecg Line -->
+<path d="M 105 264 L 140 264 L 146 257 L 152 272 L 158 259 L 164 267 L 168 264 L 215 264" fill="none" stroke="#169a47" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</div>
+<!-- Main Headline -->
+<h1 class="text-3xl sm:text-[38px] leading-tight font-extrabold text-[#0e2338] tracking-tight mb-2">
+        Pharmacy POS &amp; Management System
+      </h1>
+<!-- Feature Badges / Category Breakdown -->
+<p class="text-xl sm:text-2xl text-[#1e2e3d] font-normal tracking-normal mb-2">
+        Sales <span class="text-gray-400 font-light mx-1">|</span> Inventory <span class="text-gray-400 font-light mx-1">|</span> Accounting <span class="text-gray-400 font-light mx-1">|</span> Reports
+      </p>
+<!-- Subtitle Tagline -->
+<p class="text-base sm:text-lg text-[#324556] font-normal tracking-wide">
+        Your Health, Our Care
+      </p>
+</section>
+<!-- END: LeftBrandingPanel -->
+<!-- BEGIN: RightAuthPanel -->
+<section class="w-full lg:w-1/2 min-h-screen bg-[#0b1f33] flex flex-col justify-center items-center px-6 sm:px-12 md:px-20 lg:px-24 py-16" data-purpose="login-panel">
+<div class="w-full max-w-md mx-auto flex flex-col">
+<!-- User Avatar Icon -->
+<div class="flex justify-center mb-6" data-purpose="user-avatar-icon">
+<svg class="w-16 h-16 text-white stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<circle cx="12" cy="7" r="4.2" stroke-linecap="round" stroke-linejoin="round"></circle>
+<path d="M4.5 20.5C4.5 16.5 8 14.5 12 14.5C16 14.5 19.5 16.5 19.5 20.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Form Heading -->
+<h2 class="text-3xl sm:text-[34px] font-bold text-white text-center mb-10 tracking-tight">
+          Welcome to Your Account
+        </h2>
+<!-- Login Form -->
+<form action="#" class="space-y-6" data-purpose="auth-form" method="POST">
+<!-- Username / Email Field -->
+<div class="space-y-2.5">
+<label class="block text-[17px] font-medium text-slate-200 tracking-wide" for="username">
+              Username/Email
+            </label>
+<div class="relative">
+<input class="w-full px-4 py-3.5 rounded-lg bg-[#f0f3f6] border-0 text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-[15px] outline-none transition duration-150 ease-in-out shadow-inner" id="username" name="username" placeholder="Enter your username or email..." required="" type="text"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2.5">
+<label class="block text-[17px] font-medium text-slate-200 tracking-wide" for="password">
+              Password
+            </label>
+<div class="relative">
+<input class="w-full px-4 py-3.5 pr-12 rounded-lg bg-[#f0f3f6] border-0 text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-[15px] outline-none transition duration-150 ease-in-out shadow-inner" id="password" name="password" placeholder="Enter your password..." required="" type="password"/>
+<!-- Password Toggle Icon (Eye Crossed) -->
+<button aria-label="Toggle password visibility" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-600 hover:text-slate-900 focus:outline-none cursor-pointer" data-purpose="password-toggle-btn" id="togglePassword" type="button">
+<!-- Slash / Hidden Eye Icon -->
+<svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Remember Me & Forgot Password Options -->
+<div class="flex items-center justify-between pt-1">
+<label class="flex items-center space-x-2 text-[14px] text-slate-300 hover:text-white cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded text-emerald-600 bg-transparent border-slate-500 focus:ring-emerald-500 focus:ring-offset-0 focus:ring-1 cursor-pointer" id="remember" name="remember" type="checkbox"/>
+<span>Remember me</span>
+</label>
+<a class="text-[14px] text-slate-400 hover:text-slate-200 transition-colors duration-150" href="#">
+              Forgot password?
+            </a>
+</div>
+<!-- Primary Sign In Action Button -->
+<div class="pt-3">
+<button class="w-full py-3.5 px-4 bg-[#199946] hover:bg-[#15853c] text-white font-medium text-lg rounded-lg shadow transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0b1f33] focus:ring-emerald-500" type="submit">
+              Sign in
+            </button>
+</div>
+<!-- Create Account Link -->
+<div class="pt-1">
+<a class="inline-block text-[14px] text-slate-300 hover:text-white transition-colors duration-150" href="#">
+              Create new Account...?
+            </a>
+</div>
+</form>
+<!-- END: Form -->
+</div>
+</section>
+<!-- END: RightAuthPanel -->
+</main>
+<!-- END: MainContainer -->
+<!-- BEGIN: InteractiveScripts -->
+<script data-purpose="password-visibility-handler">
+    document.addEventListener('DOMContentLoaded', function () {
+      const toggleBtn = document.getElementById('togglePassword');
+      const passwordInput = document.getElementById('password');
+
+      if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function () {
+          const isPassword = passwordInput.getAttribute('type') === 'password';
+          passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        });
+      }
+    });
+  </script>
+<!-- END: InteractiveScripts -->
+</body>
+</html>

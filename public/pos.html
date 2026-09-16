@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS - Hussain Son's Pharmacy</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="pos-container">
+        <!-- Left Side: Products -->
+        <div class="pos-products">
+            <div class="pos-search">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search medicine or scan barcode..." autofocus>
+                    <kbd>F2</kbd>
+                </div>
+                <div class="category-filters">
+                    <button class="filter-btn active" data-category="all">All</button>
+                    <button class="filter-btn" data-category="tablets">Tablets</button>
+                    <button class="filter-btn" data-category="syrups">Syrups</button>
+                    <button class="filter-btn" data-category="injections">Injections</button>
+                    <button class="filter-btn" data-category="capsules">Capsules</button>
+                    <button class="filter-btn" data-category="ointments">Ointments</button>
+                </div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+                <!-- Products will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Right Side: Cart -->
+        <div class="pos-cart">
+            <div class="cart-header">
+                <h3><i class="fas fa-shopping-cart"></i> Current Sale</h3>
+                <div class="cart-actions">
+                    <button class="btn-icon" id="holdSaleBtn" title="Hold Sale (F8)">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                    <button class="btn-icon" id="clearCartBtn" title="Clear Cart">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="cart-customer">
+                <i class="fas fa-user"></i>
+                <span>Walk-in Customer</span>
+                <button class="btn-link" id="selectCustomerBtn">Change</button>
+            </div>
+
+            <div class="cart-items" id="cartItems">
+                <div class="empty-cart">
+                    <i class="fas fa-shopping-basket"></i>
+                    <p>Cart is empty</p>
+                    <span>Scan or search medicine to add</span>
+                </div>
+            </div>
+
+            <div class="cart-summary">
+                <div class="summary-row">
+                    <span>Subtotal</span>
+                    <span id="subtotal">₨ 0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Discount</span>
+                    <span id="discount">- ₨ 0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tax (5%)</span>
+                    <span id="tax">₨ 0.00</span>
+                </div>
+                <div class="summary-row total">
+                    <span>Total</span>
+                    <span id="total">₨ 0.00</span>
+                </div>
+            </div>
+
+            <div class="cart-payment">
+                <div class="payment-input">
+                    <label>Received</label>
+                    <input type="number" id="receivedAmount" placeholder="0.00" min="0">
+                </div>
+                <div class="payment-input">
+                    <label>Change</label>
+                    <input type="text" id="changeAmount" readonly value="₨ 0.00">
+                </div>
+            </div>
+
+            <div class="cart-footer">
+                <div class="payment-methods">
+                    <button class="payment-method active" data-method="cash">
+                        <i class="fas fa-money-bill-wave"></i> Cash
+                    </button>
+                    <button class="payment-method" data-method="card">
+                        <i class="fas fa-credit-card"></i> Card
+                    </button>
+                </div>
+                <button class="btn-complete" id="completeSaleBtn">
+                    <i class="fas fa-check-circle"></i> Complete Sale
+                    <kbd>Ctrl+Enter</kbd>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Modal -->
+    <div class="modal" id="customerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Customer</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="modal-search" placeholder="Search customer...">
+                <div class="customer-list">
+                    <div class="customer-item selected">
+                        <div class="customer-avatar">W</div>
+                        <div class="customer-info">
+                            <strong>Walk-in Customer</strong>
+                            <span>Default</span>
+                        </div>
+                    </div>
+                    <div class="customer-item">
+                        <div class="customer-avatar">AK</div>
+                        <div class="customer-info">
+                            <strong>Ahmed Khan</strong>
+                            <span>0321-1234567</span>
+                        </div>
+                    </div>
+                    <div class="customer-item">
+                        <div class="customer-avatar">FS</div>
+                        <div class="customer-info">
+                            <strong>Fatima Shah</strong>
+                            <span>0333-7654321</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/pos.js"></script>
+</body>
+</html>

@@ -1,0 +1,955 @@
+import { createDonutChart, createHorizontalBarChart } from '../utils/charts';
+import { customerService, Customer as ApiCustomer } from '../services/customer.service';
+
+interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  cnic: string;
+  type: 'regular' | 'premium' | 'wholesale';
+  credit_limit: number;
+  balance: number;
+  total_purchases: number;
+  last_purchase: string;
+  created_at: string;
+}
+
+interface CustomerTransaction {
+  id: number;
+  date: string;
+  type: 'sale' | 'payment' | 'return';
+  invoice: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+const customers: Customer[] = [
+  {
+    id: 1,
+    name: 'Ahmed Khan',
+    phone: '0321-1234567',
+    email: 'ahmed.khan@email.com',
+    address: 'Gulshan-e-Iqbal, Karachi',
+    cnic: '42101-1234567-8',
+    type: 'regular',
+    credit_limit: 50000,
+    balance: 2500,
+    total_purchases: 125000,
+    last_purchase: '2026-09-13',
+    created_at: '2025-01-15',
+  },
+  {
+    id: 2,
+    name: 'Fatima Shah',
+    phone: '0333-7654321',
+    email: 'fatima.shah@email.com',
+    address: 'DHA Phase 5, Karachi',
+    cnic: '42101-7654321-5',
+    type: 'premium',
+    credit_limit: 100000,
+    balance: 0,
+    total_purchases: 380000,
+    last_purchase: '2026-09-12',
+    created_at: '2024-06-20',
+  },
+  {
+    id: 3,
+    name: 'Ali Hassan',
+    phone: '0300-1234567',
+    email: 'ali.hassan@email.com',
+    address: 'North Nazimabad, Karachi',
+    cnic: '42101-3216549-7',
+    type: 'regular',
+    credit_limit: 30000,
+    balance: 4500,
+    total_purchases: 87000,
+    last_purchase: '2026-09-11',
+    created_at: '2025-03-10',
+  },
+  {
+    id: 4,
+    name: 'MedCity Hospital',
+    phone: '021-34567890',
+    email: 'procurement@medcity.pk',
+    address: 'Saddar, Karachi',
+    cnic: '',
+    type: 'wholesale',
+    credit_limit: 500000,
+    balance: 125000,
+    total_purchases: 2500000,
+    last_purchase: '2026-09-10',
+    created_at: '2024-01-01',
+  },
+  {
+    id: 5,
+    name: 'Sara Malik',
+    phone: '0311-9876543',
+    email: 'sara.malik@email.com',
+    address: 'Clifton, Karachi',
+    cnic: '42101-9871234-2',
+    type: 'premium',
+    credit_limit: 75000,
+    balance: 0,
+    total_purchases: 195000,
+    last_purchase: '2026-09-09',
+    created_at: '2024-09-05',
+  },
+  {
+    id: 6,
+    name: 'Kamran Brothers Pharmacy',
+    phone: '021-56789012',
+    email: 'kb.pharmacy@email.com',
+    address: 'Tariq Road, Karachi',
+    cnic: '',
+    type: 'wholesale',
+    credit_limit: 300000,
+    balance: 45000,
+    total_purchases: 1800000,
+    last_purchase: '2026-09-08',
+    created_at: '2024-02-15',
+  },
+];
+
+let filteredCustomers = [...customers];
+
+export function renderCustomers(): string {
+  return `
+    <div class="page-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h4>Customer Management</h4>
+          <p>Manage customer profiles, balances, and transaction history</p>
+        </div>
+        <button class="btn btn-brand-green" id="addCustomerBtn">
+          <i class="bi bi-person-plus me-2"></i>Add Customer
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="stat-value">${customers.length}</div>
+              <div class="stat-label">Total Customers</div>
+            </div>
+            <div class="stat-icon blue"><i class="bi bi-people"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="stat-value">${customers.filter((c) => c.type === 'premium').length}</div>
+              <div class="stat-label">Premium Customers</div>
+            </div>
+            <div class="stat-icon orange"><i class="bi bi-star"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="stat-value">₨ ${customers.reduce((sum, c) => sum + c.balance, 0).toLocaleString()}</div>
+              <div class="stat-label">Total Receivable</div>
+            </div>
+            <div class="stat-icon red"><i class="bi bi-wallet2"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="stat-value">₨ ${customers.reduce((sum, c) => sum + c.total_purchases, 0).toLocaleString()}</div>
+              <div class="stat-label">Total Sales</div>
+            </div>
+            <div class="stat-icon green"><i class="bi bi-graph-up"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <h6 class="mb-0">Customer Types Distribution</h6>
+          </div>
+          <div class="card-body">
+            ${createDonutChart({
+              labels: ['Regular', 'Premium', 'Wholesale'],
+              values: [
+                customers.filter((c) => c.type === 'regular').length,
+                customers.filter((c) => c.type === 'premium').length,
+                customers.filter((c) => c.type === 'wholesale').length,
+              ],
+              colors: ['#0d6efd', '#ffc107', '#198754']
+            }, 160)}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <h6 class="mb-0">Top Customers by Purchases</h6>
+          </div>
+          <div class="card-body">
+            ${createHorizontalBarChart({
+              labels: customers.sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5).map((c) => c.name.length > 15 ? c.name.slice(0, 15) + '...' : c.name),
+              values: customers.sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5).map((c) => c.total_purchases),
+              colors: ['#198754', '#0d6efd', '#ffc107', '#0dcaf0', '#6c757d']
+            }, 160)}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+          <div class="col-md-2">
+            <select class="form-select" id="filterType">
+              <option value="">All Types</option>
+              <option value="regular">Regular</option>
+              <option value="premium">Premium</option>
+              <option value="wholesale">Wholesale</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="filterBalance">
+              <option value="">All Balances</option>
+              <option value="zero">Zero Balance</option>
+              <option value="positive">Has Balance</option>
+              <option value="high">High Balance (>₨50K)</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="sortBy">
+              <option value="name">Sort by Name</option>
+              <option value="purchases">Sort by Purchases</option>
+              <option value="balance">Sort by Balance</option>
+              <option value="recent">Sort by Recent</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="viewMode">
+              <option value="table">Table View</option>
+              <option value="grid">Grid View</option>
+            </select>
+          </div>
+          <div class="col-md-1">
+            <button class="btn btn-outline-secondary w-100" id="resetFilters">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="customerView">
+    </div>
+  `;
+}
+
+export function initCustomers(): void {
+  // Try loading from API
+  customerService.getAll({ limit: 100 }).then(({ data }) => {
+    if (data && data.length > 0) {
+      customers.length = 0;
+      data.forEach((c) => {
+        customers.push({
+          id: c.id,
+          name: c.name,
+          phone: c.phone || '',
+          email: c.email || '',
+          address: c.address || '',
+          cnic: '',
+          type: c.type as 'regular' | 'premium' | 'wholesale',
+          credit_limit: c.credit_limit,
+          balance: c.current_balance,
+          total_purchases: c.total_purchases,
+          last_purchase: c.updated_at,
+          created_at: c.created_at,
+        });
+      });
+      filteredCustomers = [...customers];
+      renderView();
+    }
+  }).catch(() => {
+    // Fallback to local data (already initialized)
+  });
+
+  renderView();
+  initEventListeners();
+}
+
+function initEventListeners(): void {
+  document.getElementById('searchCustomer')?.addEventListener('input', () => {
+    filterCustomers();
+    renderView();
+  });
+
+  document.getElementById('filterType')?.addEventListener('change', () => {
+    filterCustomers();
+    renderView();
+  });
+
+  document.getElementById('filterBalance')?.addEventListener('change', () => {
+    filterCustomers();
+    renderView();
+  });
+
+  document.getElementById('sortBy')?.addEventListener('change', () => {
+    filterCustomers();
+    renderView();
+  });
+
+  document.getElementById('viewMode')?.addEventListener('change', () => {
+    renderView();
+  });
+
+  document.getElementById('resetFilters')?.addEventListener('click', () => {
+    (document.getElementById('searchCustomer') as HTMLInputElement).value = '';
+    (document.getElementById('filterType') as HTMLSelectElement).value = '';
+    (document.getElementById('filterBalance') as HTMLSelectElement).value = '';
+    (document.getElementById('sortBy') as HTMLSelectElement).value = 'name';
+    (document.getElementById('viewMode') as HTMLSelectElement).value = 'table';
+    filteredCustomers = [...customers];
+    renderView();
+  });
+
+  document.getElementById('addCustomerBtn')?.addEventListener('click', () => {
+    showCustomerModal();
+  });
+}
+
+function filterCustomers(): void {
+  const search = (document.getElementById('searchCustomer') as HTMLInputElement)?.value.toLowerCase() || '';
+  const type = (document.getElementById('filterType') as HTMLSelectElement)?.value || '';
+  const balance = (document.getElementById('filterBalance') as HTMLSelectElement)?.value || '';
+  const sortBy = (document.getElementById('sortBy') as HTMLSelectElement)?.value || 'name';
+
+  filteredCustomers = customers.filter((c) => {
+    const matchSearch = !search || 
+      c.name.toLowerCase().includes(search) || 
+      c.phone.includes(search) || 
+      c.cnic.includes(search) ||
+      c.email.toLowerCase().includes(search);
+    
+    const matchType = !type || c.type === type;
+
+    let matchBalance = true;
+    if (balance === 'zero') matchBalance = c.balance === 0;
+    else if (balance === 'positive') matchBalance = c.balance > 0;
+    else if (balance === 'high') matchBalance = c.balance > 50000;
+
+    return matchSearch && matchType && matchBalance;
+  });
+
+  // Sort
+  switch (sortBy) {
+    case 'name':
+      filteredCustomers.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case 'purchases':
+      filteredCustomers.sort((a, b) => b.total_purchases - a.total_purchases);
+      break;
+    case 'balance':
+      filteredCustomers.sort((a, b) => b.balance - a.balance);
+      break;
+    case 'recent':
+      filteredCustomers.sort((a, b) => new Date(b.last_purchase).getTime() - new Date(a.last_purchase).getTime());
+      break;
+  }
+}
+
+function renderView(): void {
+  const container = document.getElementById('customerView');
+  if (!container) return;
+
+  const viewMode = (document.getElementById('viewMode') as HTMLSelectElement)?.value || 'table';
+
+  if (viewMode === 'grid') {
+    renderGridView(container);
+  } else {
+    renderTableView(container);
+  }
+}
+
+function renderGridView(container: HTMLElement): void {
+  if (filteredCustomers.length === 0) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <div class="text-muted">
+            <i class="bi bi-people fs-1 d-block mb-2"></i>
+            <h6>No customers found</h6>
+            <p class="mb-0">Add your first customer to get started</p>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const typeColors: Record<string, string> = {
+    regular: 'badge-info',
+    premium: 'badge-warning',
+    wholesale: 'badge-success',
+  };
+
+  container.innerHTML = `
+    <div class="row g-3">
+      ${filteredCustomers.map((c) => `
+        <div class="col-md-4 col-xl-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex align-items-center mb-3">
+                <div class="customer-avatar me-3">
+                  <div class="avatar-circle blue">
+                    <i class="bi bi-person"></i>
+                  </div>
+                </div>
+                <div class="flex-grow-1">
+                  <h6 class="mb-0">${c.name}</h6>
+                  <small class="text-muted">${c.phone}</small>
+                </div>
+                <span class="badge-status ${typeColors[c.type]} text-capitalize">${c.type}</span>
+              </div>
+              
+              <div class="mb-3">
+                <div class="d-flex justify-content-between mb-2">
+                  <small class="text-muted">Balance:</small>
+                  <small class="${c.balance > 0 ? 'text-danger' : 'text-success'} fw-semibold">
+                    ${c.balance > 0 ? `₨ ${c.balance.toLocaleString()}` : 'Clear'}
+                  </small>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                  <small class="text-muted">Total Purchases:</small>
+                  <small class="fw-semibold">₨ ${c.total_purchases.toLocaleString()}</small>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <small class="text-muted">Last Purchase:</small>
+                  <small>${c.last_purchase ? new Date(c.last_purchase).toLocaleDateString() : 'Never'}</small>
+                </div>
+              </div>
+
+              <div class="progress mb-3" style="height: 6px;">
+                <div class="progress-bar ${c.balance > c.credit_limit * 0.8 ? 'bg-danger' : 'bg-success'}" 
+                     style="width: ${Math.min((c.total_purchases / c.credit_limit) * 100, 100)}%"></div>
+              </div>
+              <small class="text-muted d-block mb-3">
+                Credit: ₨ ${c.credit_limit.toLocaleString()}
+              </small>
+
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary flex-grow-1 view-details-btn" data-id="${c.id}">
+                  <i class="bi bi-eye me-1"></i>Details
+                </button>
+                <button class="btn btn-sm btn-outline-secondary edit-btn" data-id="${c.id}">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${c.id}">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  attachCardEvents();
+}
+
+function renderTableView(container: HTMLElement): void {
+  if (filteredCustomers.length === 0) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <div class="text-muted">
+            <i class="bi bi-people fs-1 d-block mb-2"></i>
+            <h6>No customers found</h6>
+            <p class="mb-0">Add your first customer to get started</p>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const typeColors: Record<string, string> = {
+    regular: 'badge-info',
+    premium: 'badge-warning',
+    wholesale: 'badge-success',
+  };
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Customers</h6>
+        <span class="text-muted">${filteredCustomers.length} customers</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Contact</th>
+                <th>Type</th>
+                <th>CNIC</th>
+                <th class="text-end">Credit Limit</th>
+                <th class="text-end">Balance</th>
+                <th class="text-end">Total Purchases</th>
+                <th>Last Purchase</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredCustomers.map((c) => `
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <div class="avatar-circle blue me-2" style="width: 32px; height: 32px; font-size: 12px;">
+                        <i class="bi bi-person"></i>
+                      </div>
+                      <div>
+                        <div class="fw-semibold">${c.name}</div>
+                        ${c.email ? `<small class="text-muted">${c.email}</small>` : ''}
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div>${c.phone}</div>
+                    <small class="text-muted text-truncate d-block" style="max-width: 150px;">${c.address}</small>
+                  </td>
+                  <td><span class="badge-status ${typeColors[c.type]} text-capitalize">${c.type}</span></td>
+                  <td><code>${c.cnic || '-'}</code></td>
+                  <td class="text-end">₨ ${c.credit_limit.toLocaleString()}</td>
+                  <td class="text-end">
+                    <span class="${c.balance > 0 ? 'text-danger fw-semibold' : 'text-success'}">
+                      ${c.balance > 0 ? `₨ ${c.balance.toLocaleString()}` : 'Clear'}
+                    </span>
+                  </td>
+                  <td class="text-end">₨ ${c.total_purchases.toLocaleString()}</td>
+                  <td>${c.last_purchase ? new Date(c.last_purchase).toLocaleDateString() : 'Never'}</td>
+                  <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn btn-outline-secondary view-details-btn" data-id="${c.id}" title="View Details">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <button class="btn btn-outline-secondary edit-btn" data-id="${c.id}" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn btn-outline-secondary delete-btn" data-id="${c.id}" title="Delete">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  attachCardEvents();
+}
+
+function attachCardEvents(): void {
+  document.querySelectorAll('.view-details-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.getAttribute('data-id') || '0');
+      viewCustomerDetails(id);
+    });
+  });
+
+  document.querySelectorAll('.edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.getAttribute('data-id') || '0');
+      showCustomerModal(id);
+    });
+  });
+
+  document.querySelectorAll('.delete-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.getAttribute('data-id') || '0');
+      deleteCustomer(id);
+    });
+  });
+}
+
+function showCustomerModal(editId?: number): void {
+  const isEdit = editId !== undefined;
+  const customer = isEdit ? customers.find((c) => c.id === editId) : null;
+
+  const modal = document.createElement('div');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">${isEdit ? 'Edit Customer' : 'Add New Customer'}</h5>
+          <button type="button" class="btn-close modal-close-btn"></button>
+        </div>
+        <div class="modal-body">
+          <form id="customerForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Full Name *</label>
+                <input type="text" class="form-control" id="custName" required value="${customer?.name || ''}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Phone Number *</label>
+                <input type="tel" class="form-control" id="custPhone" required value="${customer?.phone || ''}" placeholder="03XX-XXXXXXXX">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" id="custEmail" value="${customer?.email || ''}" placeholder="customer@email.com">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">CNIC</label>
+                <input type="text" class="form-control" id="custCnic" value="${customer?.cnic || ''}" placeholder="42101-XXXXXXXX-X">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">Address</label>
+                <textarea class="form-control" id="custAddress" rows="2">${customer?.address || ''}</textarea>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Customer Type *</label>
+                <select class="form-select" id="custType" required>
+                  <option value="regular" ${customer?.type === 'regular' ? 'selected' : ''}>Regular</option>
+                  <option value="premium" ${customer?.type === 'premium' ? 'selected' : ''}>Premium</option>
+                  <option value="wholesale" ${customer?.type === 'wholesale' ? 'selected' : ''}>Wholesale</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Credit Limit (₨)</label>
+                <input type="number" class="form-control" id="custCreditLimit" value="${customer?.credit_limit || 50000}" min="0">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Opening Balance (₨)</label>
+                <input type="number" class="form-control" id="custBalance" value="${customer?.balance || 0}" min="0" ${isEdit ? 'readonly' : ''}>
+                ${isEdit ? '<small class="text-muted">Use payments to adjust balance</small>' : ''}
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
+          <button type="button" class="btn btn-brand-green" id="saveCustomerBtn">
+            <i class="bi bi-check-lg me-2"></i>${isEdit ? 'Update' : 'Add'} Customer
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll('.modal-close-btn').forEach((btn) => {
+    btn.addEventListener('click', () => modal.remove());
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
+  modal.querySelector('#saveCustomerBtn')?.addEventListener('click', () => {
+    const name = (modal.querySelector('#custName') as HTMLInputElement).value;
+    const phone = (modal.querySelector('#custPhone') as HTMLInputElement).value;
+    const email = (modal.querySelector('#custEmail') as HTMLInputElement).value;
+    const cnic = (modal.querySelector('#custCnic') as HTMLInputElement).value;
+    const address = (modal.querySelector('#custAddress') as HTMLTextAreaElement).value;
+    const type = (modal.querySelector('#custType') as HTMLSelectElement).value as Customer['type'];
+    const creditLimit = parseInt((modal.querySelector('#custCreditLimit') as HTMLInputElement).value) || 50000;
+    const balance = parseInt((modal.querySelector('#custBalance') as HTMLInputElement).value) || 0;
+
+    if (!name || !phone) {
+      alert('Please fill required fields (Name, Phone)');
+      return;
+    }
+
+    if (isEdit && customer) {
+      customer.name = name;
+      customer.phone = phone;
+      customer.email = email;
+      customer.cnic = cnic;
+      customer.address = address;
+      customer.type = type;
+      customer.credit_limit = creditLimit;
+      alert('Customer updated successfully!');
+    } else {
+      customers.push({
+        id: customers.length + 1,
+        name,
+        phone,
+        email,
+        cnic,
+        address,
+        type,
+        credit_limit: creditLimit,
+        balance,
+        total_purchases: 0,
+        last_purchase: '',
+        created_at: new Date().toISOString().split('T')[0],
+      });
+      alert('Customer added successfully!');
+    }
+
+    filteredCustomers = [...customers];
+    renderView();
+    modal.remove();
+  });
+}
+
+function deleteCustomer(id: number): void {
+  const customer = customers.find((c) => c.id === id);
+  if (!customer) return;
+
+  if (customer.balance > 0) {
+    alert('Cannot delete customer with outstanding balance!');
+    return;
+  }
+
+  if (confirm(`Are you sure you want to delete "${customer.name}"?`)) {
+    const index = customers.findIndex((c) => c.id === id);
+    customers.splice(index, 1);
+    filteredCustomers = [...customers];
+    renderView();
+    alert('Customer deleted successfully!');
+  }
+}
+
+function viewCustomerDetails(id: number): void {
+  const customer = customers.find((c) => c.id === id);
+  if (!customer) return;
+
+  // Mock transactions
+  const transactions: CustomerTransaction[] = [
+    { id: 1, date: '2026-09-13', type: 'sale', invoice: 'INV-2026-000002', description: 'Medicine Purchase', debit: 525, credit: 0, balance: customer.balance },
+    { id: 2, date: '2026-09-10', type: 'payment', invoice: 'PAY-2026-0001', description: 'Cash Payment', debit: 0, credit: 1000, balance: customer.balance + 1000 },
+    { id: 3, date: '2026-09-08', type: 'sale', invoice: 'INV-2026-000005', description: 'Medicine Purchase', debit: 850, credit: 0, balance: customer.balance + 1000 - 850 },
+    { id: 4, date: '2026-09-05', type: 'return', invoice: 'RET-2026-0001', description: 'Product Return', debit: 0, credit: 150, balance: customer.balance + 1000 - 850 + 150 },
+  ];
+
+  const typeColors: Record<string, string> = {
+    regular: 'badge-info',
+    premium: 'badge-warning',
+    wholesale: 'badge-success',
+  };
+
+  const modal = document.createElement('div');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Customer Details</h5>
+          <button type="button" class="btn-close modal-close-btn"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-4">
+            <div class="col-md-8">
+              <div class="d-flex align-items-center mb-3">
+                <div class="avatar-circle blue me-3" style="width: 60px; height: 60px; font-size: 24px;">
+                  <i class="bi bi-person"></i>
+                </div>
+                <div>
+                  <h4 class="mb-0">${customer.name}</h4>
+                  <span class="badge-status ${typeColors[customer.type]} text-capitalize">${customer.type} Customer</span>
+                </div>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <p class="mb-1"><i class="bi bi-telephone me-2 text-muted"></i>${customer.phone}</p>
+                  ${customer.email ? `<p class="mb-1"><i class="bi bi-envelope me-2 text-muted"></i>${customer.email}</p>` : ''}
+                  <p class="mb-0"><i class="bi bi-geo-alt me-2 text-muted"></i>${customer.address || 'No address'}</p>
+                </div>
+                <div class="col-md-6">
+                  ${customer.cnic ? `<p class="mb-1"><i class="bi bi-card-heading me-2 text-muted"></i>CNIC: <code>${customer.cnic}</code></p>` : ''}
+                  <p class="mb-1"><i class="bi bi-calendar me-2 text-muted"></i>Customer Since: ${new Date(customer.created_at).toLocaleDateString()}</p>
+                  <p class="mb-0"><i class="bi bi-clock me-2 text-muted"></i>Last Purchase: ${customer.last_purchase ? new Date(customer.last_purchase).toLocaleDateString() : 'Never'}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card bg-light">
+                <div class="card-body">
+                  <h6 class="card-title text-muted mb-3">Account Summary</h6>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span>Balance:</span>
+                    <span class="fw-bold ${customer.balance > 0 ? 'text-danger' : 'text-success'}">
+                      ${customer.balance > 0 ? `₨ ${customer.balance.toLocaleString()}` : 'Clear'}
+                    </span>
+                  </div>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span>Credit Limit:</span>
+                    <span>₨ ${customer.credit_limit.toLocaleString()}</span>
+                  </div>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span>Available Credit:</span>
+                    <span class="text-success">₨ ${(customer.credit_limit - customer.balance).toLocaleString()}</span>
+                  </div>
+                  <div class="d-flex justify-content-between">
+                    <span>Total Purchases:</span>
+                    <span class="fw-bold">₨ ${customer.total_purchases.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h6 class="text-muted mb-3">Transaction History</h6>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Invoice</th>
+                  <th>Description</th>
+                  <th class="text-end">Debit</th>
+                  <th class="text-end">Credit</th>
+                  <th class="text-end">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${transactions.map((t) => `
+                  <tr>
+                    <td>${new Date(t.date).toLocaleDateString()}</td>
+                    <td>
+                      <span class="badge-status ${t.type === 'sale' ? 'badge-info' : t.type === 'payment' ? 'badge-success' : 'badge-warning'} text-capitalize">
+                        ${t.type}
+                      </span>
+                    </td>
+                    <td><code>${t.invoice}</code></td>
+                    <td>${t.description}</td>
+                    <td class="text-end">${t.debit > 0 ? `₨ ${t.debit.toLocaleString()}` : '-'}</td>
+                    <td class="text-end">${t.credit > 0 ? `₨ ${t.credit.toLocaleString()}` : '-'}</td>
+                    <td class="text-end fw-semibold">₨ ${(t.balance || 0).toLocaleString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close-btn">Close</button>
+          <button type="button" class="btn btn-outline-success" id="recordPaymentBtn">
+            <i class="bi bi-cash me-2"></i>Record Payment
+          </button>
+          <button type="button" class="btn btn-brand-green" id="editFromDetailsBtn">
+            <i class="bi bi-pencil me-2"></i>Edit Customer
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll('.modal-close-btn').forEach((btn) => {
+    btn.addEventListener('click', () => modal.remove());
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
+  modal.querySelector('#editFromDetailsBtn')?.addEventListener('click', () => {
+    modal.remove();
+    showCustomerModal(customer.id);
+  });
+
+  modal.querySelector('#recordPaymentBtn')?.addEventListener('click', () => {
+    modal.remove();
+    recordPayment(customer);
+  });
+}
+
+function recordPayment(customer: Customer): void {
+  const modal = document.createElement('div');
+  modal.className = 'modal show';
+  modal.innerHTML = `
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Record Payment - ${customer.name}</h5>
+          <button type="button" class="btn-close modal-close-btn"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <div class="d-flex justify-content-between">
+              <span>Current Balance:</span>
+              <strong>₨ ${customer.balance.toLocaleString()}</strong>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Payment Amount (₨) *</label>
+            <input type="number" class="form-control" id="paymentAmount" min="1" max="${customer.balance}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Payment Method *</label>
+            <select class="form-select" id="paymentMethod">
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Reference/Note</label>
+            <input type="text" class="form-control" id="paymentNote" placeholder="Receipt # or note">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close-btn">Cancel</button>
+          <button type="button" class="btn btn-success" id="savePaymentBtn">
+            <i class="bi bi-check-lg me-2"></i>Record Payment
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll('.modal-close-btn').forEach((btn) => {
+    btn.addEventListener('click', () => modal.remove());
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
+  modal.querySelector('#savePaymentBtn')?.addEventListener('click', () => {
+    const amount = parseInt((modal.querySelector('#paymentAmount') as HTMLInputElement).value) || 0;
+    const method = (modal.querySelector('#paymentMethod') as HTMLSelectElement).value;
+    const note = (modal.querySelector('#paymentNote') as HTMLInputElement).value;
+
+    if (!amount || amount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    if (amount > customer.balance) {
+      alert('Amount cannot exceed balance!');
+      return;
+    }
+
+    customer.balance -= amount;
+    filteredCustomers = [...customers];
+    renderView();
+    modal.remove();
+    alert(`Payment of ₨ ${amount.toLocaleString()} recorded successfully!\nNew Balance: ₨ ${customer.balance.toLocaleString()}`);
+  });
+}
