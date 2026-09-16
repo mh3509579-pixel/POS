@@ -142,8 +142,10 @@ function loadPage(page: string): void {
 
   switch (page) {
     case 'dashboard':
-      content.innerHTML = renderDashboard();
-      initDashboard();
+      renderDashboard().then((html) => {
+        content.innerHTML = html;
+        initDashboard();
+      });
       break;
     case 'pos':
       content.innerHTML = renderPOS();

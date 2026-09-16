@@ -168,6 +168,10 @@ export class ExpenseRepository {
       'INSERT INTO expense_categories (name, description, account_id) VALUES (?, ?, ?)',
       [data.name, data.description || null, data.account_id || null]
     );
-    return queryOne<ExpenseCategory>('SELECT * FROM expense_categories WHERE id = ?', [result.insertId])!;
+    const category = await queryOne<ExpenseCategory>('SELECT * FROM expense_categories WHERE id = ?', [result.insertId]);
+    if (!category) {
+      throw new Error('Failed to create expense category');
+    }
+    return category;
   }
 }

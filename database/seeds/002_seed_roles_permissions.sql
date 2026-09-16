@@ -2,6 +2,7 @@
 
 -- Roles
 INSERT INTO roles (name, description) VALUES
+  ('SUPER_ADMIN', 'Full system administrator with all permissions'),
   ('admin', 'Full system administrator with all permissions'),
   ('pharmacist', 'Licensed pharmacist with full operational access'),
   ('cashier', 'POS operator with sales and customer access'),
@@ -87,22 +88,26 @@ INSERT INTO permissions (name, module, action) VALUES
   -- Audit
   ('audit.view', 'audit', 'view');
 
--- Admin gets all permissions
+-- SUPER_ADMIN gets all permissions
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT 1, id FROM permissions;
 
+-- Admin gets all permissions
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 2, id FROM permissions;
+
 -- Pharmacist permissions
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT 2, id FROM permissions WHERE module IN ('pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses');
+SELECT 3, id FROM permissions WHERE module IN ('pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses');
 
 -- Cashier permissions
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT 3, id FROM permissions WHERE module IN ('pos', 'medicines', 'customers') AND action IN ('access', 'sale.create', 'return.create', 'view', 'create');
+SELECT 4, id FROM permissions WHERE module IN ('pos', 'medicines', 'customers') AND action IN ('access', 'sale.create', 'return.create', 'view', 'create');
 
 -- Inventory manager permissions
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT 4, id FROM permissions WHERE module IN ('medicines', 'inventory', 'purchases', 'suppliers');
+SELECT 5, id FROM permissions WHERE module IN ('medicines', 'inventory', 'purchases', 'suppliers');
 
 -- Accountant permissions
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT 5, id FROM permissions WHERE module IN ('accounting', 'expenses', 'reports');
+SELECT 6, id FROM permissions WHERE module IN ('accounting', 'expenses', 'reports');

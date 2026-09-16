@@ -224,6 +224,6 @@ export class AccountingService implements IAccountingService {
 
 // Helper function to execute queries
 async function execute(sql: string, params?: any[]): Promise<any> {
-  const { execute: exec } = await import('../database/connection.js');
+  const { execute: exec } = await import('../../../infrastructure/database/connection.js');
   return exec(sql, params);
 }

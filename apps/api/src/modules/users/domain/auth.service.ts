@@ -12,7 +12,11 @@ export class AuthService {
   }
 
   async login(data: LoginDTO): Promise<LoginResponse> {
-    const user = await this.userRepo.findByUsername(data.username);
+    let user = await this.userRepo.findByUsername(data.username);
+
+    if (!user && data.username.includes('@')) {
+      user = await this.userRepo.findByEmail(data.username);
+    }
 
     if (!user) {
       throw new Error('Invalid username or password');

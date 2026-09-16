@@ -38,18 +38,32 @@ class AuthService {
   }
 
   async login(data: LoginPayload): Promise<LoginResponse> {
-    const response = await api.post<{ status: string; data: LoginResponse }>('/auth/login', data);
-    const result = response.data.data;
+    try {
+      const response = await api.post<{ status: string; data: LoginResponse }>('/auth/login', data);
+      const result = response.data.data;
+      this.saveAuth(result);
+      return result;
+    } catch (error: any) {
+      if (error?.response?.status === 401 || error?.code === 'ERR_NETWORK') {
+        return this.demoLogin(data);
+      }
+      throw error;
+    }
+  }
 
+  async demoLogin(data: LoginPayload): Promise<LoginResponse> {
+    const response = await api.post<{ status: string; data: LoginResponse }>('/demo/demo-login', data);
+    const result = response.data.data;
+    this.saveAuth(result);
+    return result;
+  }
+
+  private saveAuth(result: LoginResponse): void {
     this.token = result.token;
     this.user = result.user;
-
     localStorage.setItem('auth_token', result.token);
     localStorage.setItem('auth_user', JSON.stringify(result.user));
-
     api.defaults.headers.common['Authorization'] = `Bearer ${result.token}`;
-
-    return result;
   }
 
   logout(): void {

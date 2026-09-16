@@ -1,7 +1,5 @@
+import api from '../services/api.service';
 import { medicineStore } from '../stores/medicine.store';
-import { medicineService } from '../services/medicine.service';
-import { customerService } from '../services/customer.service';
-import { supplierService } from '../services/supplier.service';
 
 interface DashboardData {
   sales: {
@@ -48,77 +46,123 @@ interface DashboardData {
   };
 }
 
-function getDashboardData(): DashboardData {
+async function fetchDashboardData(): Promise<DashboardData> {
   const medicines = medicineStore.getAll();
   
-  return {
-    sales: {
-      today: 1538,
-      thisWeek: 45250,
-      thisMonth: 185000,
-      todayCount: 12,
-      recent: [
-        { invoice: 'INV-2026-000005', customer: 'Ali Hassan', amount: 168, status: 'completed', date: '2026-09-13T16:00:00' },
-        { invoice: 'INV-2026-000004', customer: 'Walk-in Customer', amount: 173.25, status: 'completed', date: '2026-09-12T09:15:00' },
-        { invoice: 'INV-2026-000003', customer: 'Fatima Shah', amount: 630, status: 'completed', date: '2026-09-12T14:20:00' },
-        { invoice: 'INV-2026-000002', customer: 'Ahmed Khan', amount: 525, status: 'completed', date: '2026-09-13T11:45:00' },
-        { invoice: 'INV-2026-000001', customer: 'Walk-in Customer', amount: 141.75, status: 'completed', date: '2026-09-13T10:30:00' },
-      ],
-    },
-    purchases: {
-      today: 40000,
-      thisMonth: 285000,
-      pendingPayments: 295000,
-      recent: [
-        { po: 'PO-2026-000005', supplier: 'Lahore Medical', amount: 65000, status: 'received', date: '2026-09-08' },
-        { po: 'PO-2026-000004', supplier: 'Karachi Pharma', amount: 45000, status: 'received', date: '2026-09-05' },
-        { po: 'PO-2026-000003', supplier: 'Global Pharma', amount: 85000, status: 'received', date: '2026-09-03' },
-        { po: 'PO-2026-000002', supplier: 'Islamabad Drug', amount: 35000, status: 'pending', date: '2026-09-01' },
-        { po: 'PO-2026-000001', supplier: 'Karachi Pharma', amount: 40000, status: 'received', date: '2026-09-13' },
-      ],
-    },
-    inventory: {
-      totalMedicines: medicines.length || 20,
-      totalStockValue: medicines.reduce((sum, m) => sum + (m.stock * m.purchasePrice), 0) || 1105000,
-      lowStock: medicines.filter((m) => m.stock < 50).length || 3,
-      expiringSoon: 2,
-      outOfStock: medicines.filter((m) => m.stock === 0).length || 0,
-      lowStockItems: [
-        { name: 'Cetirizine 10mg', stock: 15, minRequired: 50 },
-        { name: 'Brufen 400mg', stock: 28, minRequired: 50 },
-        { name: 'Dolo 650', stock: 20, minRequired: 40 },
-      ],
-      expiringItems: [
-        { name: 'Amoxicillin 500mg', batch: 'A001', expiry: '2026-10-15', stock: 150 },
-        { name: 'Cetirizine 10mg', batch: 'C001', expiry: '2026-10-20', stock: 15 },
-      ],
-    },
-    customers: {
-      total: 6,
-      pendingReceivable: 177000,
-      topCustomers: [
-        { name: 'MedCity Hospital', type: 'wholesale', balance: 125000 },
-        { name: 'Kamran Brothers', type: 'wholesale', balance: 45000 },
-        { name: 'Ali Hassan', type: 'regular', balance: 4500 },
-        { name: 'Ahmed Khan', type: 'regular', balance: 2500 },
-      ],
-    },
-    suppliers: {
-      total: 6,
-      pendingPayable: 295000,
-    },
-    expenses: {
-      today: 0,
-      thisMonth: 254700,
-    },
-    accounting: {
-      revenue: 2250000,
-      cogs: 1525000,
-      grossProfit: 725000,
-      netProfit: 446800,
-      profitMargin: 32.2,
-    },
-  };
+  try {
+    const [salesRes, purchasesRes, customersRes, suppliersRes, expensesRes] = await Promise.allSettled([
+      api.get('/transactions/sales?limit=5'),
+      api.get('/transactions/purchases?limit=5'),
+      api.get('/customers?limit=100'),
+      api.get('/suppliers?limit=100'),
+      api.get('/transactions/expenses?limit=100'),
+    ]);
+
+    const salesData = salesRes.status === 'fulfilled' ? salesRes.value.data : { data: [], total: 0 };
+    const purchasesData = purchasesRes.status === 'fulfilled' ? purchasesRes.value.data : { data: [], total: 0 };
+    const customersData = customersRes.status === 'fulfilled' ? customersRes.value.data : { data: [], total: 0 };
+    const suppliersData = suppliersRes.status === 'fulfilled' ? suppliersRes.value.data : { data: [], total: 0 };
+    const expensesData = expensesRes.status === 'fulfilled' ? expensesRes.value.data : { data: [], total: 0 };
+
+    const today = new Date().toISOString().split('T')[0];
+    const todaySales = salesData.data?.filter((s: any) => s.created_at?.startsWith(today)) || [];
+    const todayPurchases = purchasesData.data?.filter((p: any) => p.created_at?.startsWith(today)) || [];
+    const todayExpenses = expensesData.data?.filter((e: any) => e.expense_date?.startsWith(today)) || [];
+
+    return {
+      sales: {
+        today: todaySales.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0),
+        thisWeek: salesData.data?.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0) || 0,
+        thisMonth: salesData.data?.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0) || 0,
+        todayCount: todaySales.length,
+        recent: (salesData.data || []).slice(0, 5).map((s: any) => ({
+          invoice: s.invoice_number,
+          customer: s.customer_name || 'Walk-in Customer',
+          amount: s.total_amount,
+          status: s.status,
+          date: s.created_at,
+        })),
+      },
+      purchases: {
+        today: todayPurchases.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0),
+        thisMonth: purchasesData.data?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || 0,
+        pendingPayments: purchasesData.data?.filter((p: any) => p.payment_status !== 'paid').reduce((sum: number, p: any) => sum + (p.total_amount - (p.paid_amount || 0)), 0) || 0,
+        recent: (purchasesData.data || []).slice(0, 5).map((p: any) => ({
+          po: p.purchase_number,
+          supplier: p.supplier_name || 'Unknown',
+          amount: p.total_amount,
+          status: p.status,
+          date: p.created_at,
+        })),
+      },
+      inventory: {
+        totalMedicines: medicines.length,
+        totalStockValue: medicines.reduce((sum, m) => sum + (m.stock * m.purchasePrice), 0),
+        lowStock: medicines.filter((m) => m.stock > 0 && m.stock < m.reorderLevel).length,
+        expiringSoon: medicines.filter((m) => {
+          const expiry = new Date(m.expiry);
+          const daysUntil = (expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+          return daysUntil > 0 && daysUntil <= 30;
+        }).length,
+        outOfStock: medicines.filter((m) => m.stock === 0).length,
+        lowStockItems: medicines
+          .filter((m) => m.stock > 0 && m.stock < m.reorderLevel)
+          .slice(0, 5)
+          .map((m) => ({ name: m.name, stock: m.stock, minRequired: m.reorderLevel })),
+        expiringItems: medicines
+          .filter((m) => {
+            const expiry = new Date(m.expiry);
+            const daysUntil = (expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+            return daysUntil > 0 && daysUntil <= 90;
+          })
+          .slice(0, 5)
+          .map((m) => ({ name: m.name, batch: m.batch, expiry: m.expiry, stock: m.stock })),
+      },
+      customers: {
+        total: customersData.total || customersData.data?.length || 0,
+        pendingReceivable: customersData.data?.filter((c: any) => c.balance > 0).reduce((sum: number, c: any) => sum + c.balance, 0) || 0,
+        topCustomers: (customersData.data || [])
+          .filter((c: any) => c.balance > 0)
+          .sort((a: any, b: any) => b.balance - a.balance)
+          .slice(0, 4)
+          .map((c: any) => ({ name: c.name, type: c.customer_type || 'regular', balance: c.balance || 0 })),
+      },
+      suppliers: {
+        total: suppliersData.total || suppliersData.data?.length || 0,
+        pendingPayable: suppliersData.data?.filter((s: any) => s.balance > 0).reduce((sum: number, s: any) => sum + s.balance, 0) || 0,
+      },
+      expenses: {
+        today: todayExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0),
+        thisMonth: expensesData.data?.reduce((sum: number, e: any) => sum + (e.amount || 0), 0) || 0,
+      },
+      accounting: {
+        revenue: salesData.data?.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0) || 0,
+        cogs: 0,
+        grossProfit: 0,
+        netProfit: 0,
+        profitMargin: 0,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to fetch dashboard data:', error);
+    return {
+      sales: { today: 0, thisWeek: 0, thisMonth: 0, todayCount: 0, recent: [] },
+      purchases: { today: 0, thisMonth: 0, pendingPayments: 0, recent: [] },
+      inventory: {
+        totalMedicines: medicines.length,
+        totalStockValue: medicines.reduce((sum, m) => sum + (m.stock * m.purchasePrice), 0),
+        lowStock: medicines.filter((m) => m.stock > 0 && m.stock < m.reorderLevel).length,
+        expiringSoon: 0,
+        outOfStock: medicines.filter((m) => m.stock === 0).length,
+        lowStockItems: [],
+        expiringItems: [],
+      },
+      customers: { total: 0, pendingReceivable: 0, topCustomers: [] },
+      suppliers: { total: 0, pendingPayable: 0 },
+      expenses: { today: 0, thisMonth: 0 },
+      accounting: { revenue: 0, cogs: 0, grossProfit: 0, netProfit: 0, profitMargin: 0 },
+    };
+  }
 }
 
 function createMiniLineChart(values: number[], color: string, width: number = 100, height: number = 30): string {
@@ -184,8 +228,8 @@ function createDonutChart(data: { value: number; color: string }[], size: number
   return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${arcs}</svg>`;
 }
 
-export function renderDashboard(): string {
-  const data = getDashboardData();
+export async function renderDashboard(): Promise<string> {
+  const data = await fetchDashboardData();
 
   return `
     <div class="page-header">
@@ -703,31 +747,10 @@ export function renderDashboard(): string {
 }
 
 export function initDashboard(): void {
-  // Try loading stats from API
-  Promise.all([
-    customerService.getStats().catch(() => null),
-    supplierService.getStats().catch(() => null),
-    medicineService.getLowStock().catch(() => null),
-  ]).then(([customerStats, supplierStats, lowStock]) => {
-    if (customerStats) {
-      const totalCustomers = document.getElementById('totalCustomers');
-      if (totalCustomers) totalCustomers.textContent = String(customerStats.total);
-    }
-    if (supplierStats) {
-      const totalSuppliers = document.getElementById('totalSuppliers');
-      if (totalSuppliers) totalSuppliers.textContent = String(supplierStats.total);
-    }
-    if (lowStock) {
-      const lowStockCount = document.getElementById('lowStockCount');
-      if (lowStockCount) lowStockCount.textContent = String(lowStock.length);
-    }
-  });
-
   document.querySelectorAll('.view-all-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const page = btn.getAttribute('data-page');
       if (page) {
-        // Navigate to the page using sidebar navigation
         const navItem = document.querySelector(`.sidebar-nav .nav-item[data-page="${page}"]`);
         if (navItem) {
           navItem.dispatchEvent(new Event('click'));
@@ -736,10 +759,10 @@ export function initDashboard(): void {
     });
   });
 
-  document.getElementById('refreshDashboard')?.addEventListener('click', () => {
+  document.getElementById('refreshDashboard')?.addEventListener('click', async () => {
     const content = document.getElementById('pageContent');
     if (content) {
-      content.innerHTML = renderDashboard();
+      content.innerHTML = await renderDashboard();
       initDashboard();
     }
   });

@@ -1,4 +1,6 @@
 import { medicineStore, Medicine } from '../stores/medicine.store';
+import { printInvoice, InvoiceData } from '../utils/invoice';
+import { authService } from '../services/auth.service';
 
 export function renderPOS(): string {
   return `
@@ -355,7 +357,9 @@ export function initPOS(): () => void {
     }
 
     const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const total = (subtotal - discount) * (1 + taxRate);
+    const taxable = subtotal - discount;
+    const tax = taxable * taxRate;
+    const total = taxable + tax;
     const receivedInput = document.getElementById('receivedAmount') as HTMLInputElement;
     const received = parseFloat(receivedInput?.value || '0');
 
@@ -364,26 +368,40 @@ export function initPOS(): () => void {
       return;
     }
 
-    // Update stock for each item in cart
+    const user = authService.getUser();
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`;
+
+    const invoiceData: InvoiceData = {
+      invoiceNumber,
+      date: new Date().toISOString(),
+      customer: {
+        name: customer.name,
+        phone: customer.phone,
+      },
+      cashier: user?.full_name || 'Cashier',
+      items: cart.map((item) => ({
+        name: item.name,
+        batch: '',
+        quantity: item.qty,
+        unitPrice: item.price,
+        discount: 0,
+        total: item.price * item.qty,
+      })),
+      subtotal,
+      discount,
+      tax,
+      total,
+      paymentMethod,
+      amountPaid: received,
+      change: received - total,
+    };
+
     cart.forEach((item) => {
       medicineStore.updateStock(item.id, -item.qty);
     });
 
-    console.log('Sale completed:', {
-      cart: [...cart],
-      customer,
-      subtotal,
-      discount,
-      tax: subtotal * taxRate,
-      total,
-      received,
-      change: received - total,
-      paymentMethod,
-    });
+    printInvoice(invoiceData);
 
-    alert(
-      `Sale completed!\\nTotal: ₨ ${total.toFixed(2)}\\nChange: ₨ ${(received - total).toFixed(2)}`,
-    );
     cart.length = 0;
     discount = 0;
     customer = { name: 'Walk-in Customer', phone: '' };

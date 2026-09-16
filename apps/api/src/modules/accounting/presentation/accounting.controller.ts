@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { AccountRepository } from '../../infrastructure/repositories/account.repository.js';
-import { JournalEntryRepository } from '../../infrastructure/repositories/journal-entry.repository.js';
-import { GeneralLedgerRepository } from '../../infrastructure/repositories/general-ledger.repository.js';
-import { AccountingService } from './accounting.service.js';
+import { AccountRepository } from '../infrastructure/account.repository.js';
+import { JournalEntryRepository } from '../infrastructure/journal-entry.repository.js';
+import { GeneralLedgerRepository } from '../infrastructure/general-ledger.repository.js';
+import { AccountingService } from '../application/accounting.service.js';
 
 const accountRepo = new AccountRepository();
 const journalEntryRepo = new JournalEntryRepository();
