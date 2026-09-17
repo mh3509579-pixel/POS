@@ -29,106 +29,8 @@ interface SupplierTransaction {
   balance: number;
 }
 
-const suppliers: Supplier[] = [
-  {
-    id: 1,
-    name: 'Karachi Pharma Wholesalers',
-    phone: '021-34567890',
-    email: 'info@karachipharma.pk',
-    address: 'Saddar, Karachi',
-    cnic: '42101-1234567-8',
-    company: 'Karachi Pharma Pvt Ltd',
-    type: 'local',
-    credit_limit: 500000,
-    balance: 85000,
-    total_purchases: 2500000,
-    last_purchase: '2026-09-13',
-    rating: 4.5,
-    created_at: '2024-01-15',
-  },
-  {
-    id: 2,
-    name: 'Lahore Medical Suppliers',
-    phone: '042-34567890',
-    email: 'sales@lahoremedical.pk',
-    address: 'Mall Road, Lahore',
-    cnic: '35101-7654321-5',
-    company: 'Lahore Medical Corp',
-    type: 'national',
-    credit_limit: 300000,
-    balance: 42000,
-    total_purchases: 1800000,
-    last_purchase: '2026-09-12',
-    rating: 4.2,
-    created_at: '2024-03-20',
-  },
-  {
-    id: 3,
-    name: 'Islamabad Drug House',
-    phone: '051-34567890',
-    email: 'contact@islamabaddrug.pk',
-    address: 'Blue Area, Islamabad',
-    cnic: '61101-9871234-2',
-    company: 'Islamabad Drug Distributors',
-    type: 'national',
-    credit_limit: 200000,
-    balance: 0,
-    total_purchases: 950000,
-    last_purchase: '2026-09-10',
-    rating: 4.0,
-    created_at: '2024-06-10',
-  },
-  {
-    id: 4,
-    name: 'Global Pharma Imports',
-    phone: '021-111222333',
-    email: 'import@globalpharma.com',
-    address: 'Port Qasim, Karachi',
-    cnic: '',
-    company: 'Global Pharma International',
-    type: 'international',
-    credit_limit: 1000000,
-    balance: 125000,
-    total_purchases: 5000000,
-    last_purchase: '2026-09-08',
-    rating: 4.8,
-    created_at: '2023-09-01',
-  },
-  {
-    id: 5,
-    name: 'Peshawar Pharma',
-    phone: '091-34567890',
-    email: 'info@peshawarpharma.pk',
-    address: 'University Road, Peshawar',
-    cnic: '17101-5551234-3',
-    company: 'Peshawar Pharma Trading',
-    type: 'local',
-    credit_limit: 150000,
-    balance: 28000,
-    total_purchases: 680000,
-    last_purchase: '2026-09-05',
-    rating: 3.8,
-    created_at: '2025-01-15',
-  },
-  {
-    id: 6,
-    name: 'Al-Rehman Medical Store',
-    phone: '021-444555666',
-    email: 'alrehman.medical@gmail.com',
-    address: 'Nazimabad, Karachi',
-    cnic: '42101-3334445-6',
-    company: 'Al-Rehman Enterprises',
-    type: 'local',
-    credit_limit: 100000,
-    balance: 15000,
-    total_purchases: 420000,
-    last_purchase: '2026-09-01',
-    rating: 4.1,
-    created_at: '2025-04-20',
-  },
-];
-
-let filteredSuppliers = [...suppliers];
+let suppliers: Supplier[] = [];
+let filteredSuppliers: Supplier[] = [];
 
 export function renderSuppliers(): string {
   return `
@@ -144,12 +46,12 @@ export function renderSuppliers(): string {
       </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" id="supplierStats">
       <div class="col-md-3">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">${suppliers.length}</div>
+              <div class="stat-value" id="statTotal">0</div>
               <div class="stat-label">Total Suppliers</div>
             </div>
             <div class="stat-icon blue"><i class="bi bi-building"></i></div>
@@ -160,7 +62,7 @@ export function renderSuppliers(): string {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">${suppliers.filter((s) => s.type === 'international').length}</div>
+              <div class="stat-value" id="statInternational">0</div>
               <div class="stat-label">International</div>
             </div>
             <div class="stat-icon orange"><i class="bi bi-globe"></i></div>
@@ -171,7 +73,7 @@ export function renderSuppliers(): string {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ ${suppliers.reduce((sum, s) => sum + s.balance, 0).toLocaleString()}</div>
+              <div class="stat-value" id="statPayable">₨ 0</div>
               <div class="stat-label">Total Payable</div>
             </div>
             <div class="stat-icon red"><i class="bi bi-wallet2"></i></div>
@@ -182,7 +84,7 @@ export function renderSuppliers(): string {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ ${suppliers.reduce((sum, s) => sum + s.total_purchases, 0).toLocaleString()}</div>
+              <div class="stat-value" id="statPurchases">₨ 0</div>
               <div class="stat-label">Total Purchases</div>
             </div>
             <div class="stat-icon green"><i class="bi bi-graph-up"></i></div>
@@ -197,17 +99,7 @@ export function renderSuppliers(): string {
           <div class="card-header">
             <h6 class="mb-0">Supplier Types</h6>
           </div>
-          <div class="card-body">
-            ${createDonutChart({
-              labels: ['Local', 'National', 'International'],
-              values: [
-                suppliers.filter((s) => s.type === 'local').length,
-                suppliers.filter((s) => s.type === 'national').length,
-                suppliers.filter((s) => s.type === 'international').length,
-              ],
-              colors: ['#0d6efd', '#ffc107', '#198754']
-            }, 160)}
-          </div>
+          <div class="card-body" id="supplierTypeChart"></div>
         </div>
       </div>
       <div class="col-md-6">
@@ -215,18 +107,20 @@ export function renderSuppliers(): string {
           <div class="card-header">
             <h6 class="mb-0">Top Suppliers by Purchases</h6>
           </div>
-          <div class="card-body">
-            ${createHorizontalBarChart({
-              labels: suppliers.sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5).map((s) => s.name.length > 18 ? s.name.slice(0, 18) + '...' : s.name),
-              values: suppliers.sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5).map((s) => s.total_purchases),
-              colors: ['#198754', '#0d6efd', '#ffc107', '#0dcaf0', '#6c757d']
-            }, 160)}
-          </div>
+          <div class="card-body" id="topSuppliersChart"></div>
         </div>
       </div>
     </div>
 
     <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" id="searchSupplier" placeholder="Search suppliers...">
+            </div>
+          </div>
           <div class="col-md-2">
             <select class="form-select" id="filterType">
               <option value="">All Types</option>
@@ -272,7 +166,7 @@ export function renderSuppliers(): string {
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Suppliers Directory</h6>
-        <span class="text-muted" id="supplierCount">${suppliers.length} suppliers</span>
+        <span class="text-muted" id="supplierCount">0 suppliers</span>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -299,38 +193,80 @@ export function renderSuppliers(): string {
   `;
 }
 
-export function initSuppliers(): void {
-  // Try loading from API
-  supplierService.getAll({ limit: 100 }).then(({ data }) => {
-    if (data && data.length > 0) {
-      suppliers.length = 0;
-      data.forEach((s) => {
-        suppliers.push({
-          id: s.id,
-          name: s.name,
-          phone: s.phone || '',
-          email: s.email || '',
-          address: s.address || '',
-          cnic: '',
-          company: s.contact_person || '',
-          type: s.type as 'local' | 'national' | 'international',
-          credit_limit: s.payment_terms_days * 1000,
-          balance: s.current_balance,
-          total_purchases: s.total_purchases,
-          last_purchase: s.updated_at,
-          rating: s.rating,
-          created_at: s.created_at,
-        });
-      });
-      filteredSuppliers = [...suppliers];
-      renderTable();
-    }
-  }).catch(() => {
-    // Fallback to local data (already initialized)
-  });
+function renderStats(): void {
+  const total = suppliers.length;
+  const international = suppliers.filter((s) => s.type === 'international').length;
+  const payable = suppliers.reduce((sum, s) => sum + s.balance, 0);
+  const purchases = suppliers.reduce((sum, s) => sum + s.total_purchases, 0);
 
-  renderTable();
+  const el = (id: string) => document.getElementById(id);
+  if (el('statTotal')) el('statTotal')!.textContent = String(total);
+  if (el('statInternational')) el('statInternational')!.textContent = String(international);
+  if (el('statPayable')) el('statPayable')!.textContent = `₨ ${payable.toLocaleString()}`;
+  if (el('statPurchases')) el('statPurchases')!.textContent = `₨ ${purchases.toLocaleString()}`;
+}
+
+function renderCharts(): void {
+  const typeChart = document.getElementById('supplierTypeChart');
+  const topChart = document.getElementById('topSuppliersChart');
+
+  if (typeChart) {
+    typeChart.innerHTML = createDonutChart({
+      labels: ['Local', 'National', 'International'],
+      values: [
+        suppliers.filter((s) => s.type === 'local').length,
+        suppliers.filter((s) => s.type === 'national').length,
+        suppliers.filter((s) => s.type === 'international').length,
+      ],
+      colors: ['#0d6efd', '#ffc107', '#198754']
+    }, 160);
+  }
+
+  if (topChart) {
+    const sorted = [...suppliers].sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5);
+    topChart.innerHTML = createHorizontalBarChart({
+      labels: sorted.map((s) => s.name.length > 18 ? s.name.slice(0, 18) + '...' : s.name),
+      values: sorted.map((s) => s.total_purchases),
+      colors: ['#198754', '#0d6efd', '#ffc107', '#0dcaf0', '#6c757d']
+    }, 160);
+  }
+}
+
+export function initSuppliers(): void {
+  loadSuppliers();
   initEventListeners();
+}
+
+async function loadSuppliers(): Promise<void> {
+  try {
+    const { data } = await supplierService.getAll({ limit: 500 });
+    suppliers = data.map((s) => ({
+      id: s.id,
+      name: s.name,
+      phone: s.phone || '',
+      email: s.email || '',
+      address: s.address || '',
+      cnic: s.tax_number || '',
+      company: s.contact_person || '',
+      type: s.type as 'local' | 'national' | 'international',
+      credit_limit: s.payment_terms_days * 1000,
+      balance: s.current_balance,
+      total_purchases: s.total_purchases,
+      last_purchase: s.updated_at,
+      rating: s.rating,
+      created_at: s.created_at,
+    }));
+    filteredSuppliers = [...suppliers];
+    renderStats();
+    renderCharts();
+    renderTable();
+  } catch {
+    suppliers = [];
+    filteredSuppliers = [];
+    renderStats();
+    renderCharts();
+    renderTable();
+  }
 }
 
 function initEventListeners(): void {
@@ -621,61 +557,35 @@ function showSupplierModal(editId?: number): void {
     if (e.target === modal) modal.remove();
   });
 
-  modal.querySelector('#saveSupplierBtn')?.addEventListener('click', () => {
+  modal.querySelector('#saveSupplierBtn')?.addEventListener('click', async () => {
     const name = (modal.querySelector('#supName') as HTMLInputElement).value;
-    const company = (modal.querySelector('#supCompany') as HTMLInputElement).value;
     const phone = (modal.querySelector('#supPhone') as HTMLInputElement).value;
     const email = (modal.querySelector('#supEmail') as HTMLInputElement).value;
-    const cnic = (modal.querySelector('#supCnic') as HTMLInputElement).value;
     const type = (modal.querySelector('#supType') as HTMLSelectElement).value as Supplier['type'];
     const address = (modal.querySelector('#supAddress') as HTMLTextAreaElement).value;
     const creditLimit = parseInt((modal.querySelector('#supCreditLimit') as HTMLInputElement).value) || 200000;
-    const balance = parseInt((modal.querySelector('#supBalance') as HTMLInputElement).value) || 0;
     const rating = parseFloat((modal.querySelector('#supRating') as HTMLInputElement).value) || 4;
 
-    if (!name || !company || !phone) {
-      alert('Please fill required fields (Name, Company, Phone)');
+    if (!name || !phone) {
+      alert('Please fill required fields (Name, Phone)');
       return;
     }
 
-    if (isEdit && supplier) {
-      supplier.name = name;
-      supplier.company = company;
-      supplier.phone = phone;
-      supplier.email = email;
-      supplier.cnic = cnic;
-      supplier.type = type;
-      supplier.address = address;
-      supplier.credit_limit = creditLimit;
-      supplier.rating = rating;
-      alert('Supplier updated successfully!');
-    } else {
-      suppliers.push({
-        id: suppliers.length + 1,
-        name,
-        company,
-        phone,
-        email,
-        cnic,
-        type,
-        address,
-        credit_limit: creditLimit,
-        balance,
-        total_purchases: 0,
-        last_purchase: '',
-        rating,
-        created_at: new Date().toISOString().split('T')[0],
-      });
-      alert('Supplier added successfully!');
+    try {
+      if (isEdit && supplier) {
+        await supplierService.update(supplier.id, { name, phone, email, type, address, contact_person: name, payment_terms_days: Math.ceil(creditLimit / 1000) });
+      } else {
+        await supplierService.create({ name, phone, email, type, address, contact_person: name, payment_terms_days: Math.ceil(creditLimit / 1000) });
+      }
+      modal.remove();
+      await loadSuppliers();
+    } catch {
+      alert('Failed to save supplier. Please try again.');
     }
-
-    filteredSuppliers = [...suppliers];
-    renderTable();
-    modal.remove();
   });
 }
 
-function deleteSupplier(id: number): void {
+async function deleteSupplier(id: number): Promise<void> {
   const supplier = suppliers.find((s) => s.id === id);
   if (!supplier) return;
 
@@ -685,11 +595,12 @@ function deleteSupplier(id: number): void {
   }
 
   if (confirm(`Are you sure you want to delete "${supplier.name}"?`)) {
-    const index = suppliers.findIndex((s) => s.id === id);
-    suppliers.splice(index, 1);
-    filteredSuppliers = [...suppliers];
-    renderTable();
-    alert('Supplier deleted successfully!');
+    try {
+      await supplierService.delete(id);
+      await loadSuppliers();
+    } catch {
+      alert('Failed to delete supplier. Please try again.');
+    }
   }
 }
 

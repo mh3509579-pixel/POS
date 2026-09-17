@@ -1,5 +1,6 @@
 import { medicineStore } from '../stores/medicine.store';
 import { createLineChart, createDonutChart } from '../utils/charts';
+import { purchaseService, Purchase as ApiPurchase } from '../services/purchase.service';
 
 type PurchaseTab = 'list' | 'new' | 'returns';
 
@@ -36,63 +37,8 @@ interface Purchase {
   created_at: string;
 }
 
-const suppliers: Supplier[] = [
-  { id: 1, name: 'Karachi Pharmaceuticals', phone: '021-34567890', address: 'Karachi, Sindh', balance: 150000 },
-  { id: 2, name: 'Lahore Medical Suppliers', phone: '042-34567890', address: 'Lahore, Punjab', balance: 85000 },
-  { id: 3, name: 'Islamabad Drug House', phone: '051-34567890', address: 'Islamabad', balance: 42000 },
-  { id: 4, name: 'Peshawar Pharma', phone: '091-34567890', address: 'Peshawar, KPK', balance: 28000 },
-];
-
-const purchases: Purchase[] = [
-  {
-    id: 1,
-    purchase_number: 'PO-2026-000001',
-    supplier: suppliers[0],
-    items: [
-      { medicine_id: 1, medicine_name: 'Paracetamol 500mg', batch: 'P001', expiry: '2027-05-15', quantity: 500, purchase_price: 40, sale_price: 50, total: 20000 },
-      { medicine_id: 2, medicine_name: 'Amoxicillin 500mg', batch: 'A001', expiry: '2026-12-20', quantity: 200, purchase_price: 100, sale_price: 120, total: 20000 },
-    ],
-    subtotal: 40000,
-    discount: 0,
-    tax: 0,
-    total: 40000,
-    status: 'received',
-    payment_status: 'paid',
-    created_at: '2026-09-10',
-  },
-  {
-    id: 2,
-    purchase_number: 'PO-2026-000002',
-    supplier: suppliers[1],
-    items: [
-      { medicine_id: 5, medicine_name: 'Brufen 400mg', batch: 'B001', expiry: '2027-06-30', quantity: 300, purchase_price: 45, sale_price: 55, total: 13500 },
-      { medicine_id: 6, medicine_name: 'Augmentin 625mg', batch: 'AU01', expiry: '2026-11-15', quantity: 100, purchase_price: 250, sale_price: 280, total: 25000 },
-    ],
-    subtotal: 38500,
-    discount: 1000,
-    tax: 0,
-    total: 37500,
-    status: 'received',
-    payment_status: 'partial',
-    created_at: '2026-09-11',
-  },
-  {
-    id: 3,
-    purchase_number: 'PO-2026-000003',
-    supplier: suppliers[2],
-    items: [
-      { medicine_id: 7, medicine_name: 'Nexium 40mg', batch: 'N001', expiry: '2027-09-20', quantity: 50, purchase_price: 400, sale_price: 450, total: 20000 },
-    ],
-    subtotal: 20000,
-    discount: 0,
-    tax: 0,
-    total: 20000,
-    status: 'pending',
-    payment_status: 'unpaid',
-    created_at: '2026-09-12',
-  },
-];
-
+let suppliers: Supplier[] = [];
+let purchases: Purchase[] = [];
 let currentTab: PurchaseTab = 'list';
 let cart: PurchaseItem[] = [];
 let selectedSupplier: Supplier | null = null;
@@ -127,8 +73,30 @@ export function renderPurchases(): string {
 }
 
 export function initPurchases(): void {
-  loadTab('list');
+  loadPurchases();
   initTabs();
+}
+
+async function loadPurchases(): Promise<void> {
+  try {
+    const { data } = await purchaseService.getAll(500);
+    purchases = data.map((p) => ({
+      id: p.id,
+      purchase_number: p.purchase_number,
+      supplier: { id: p.supplier_id, name: (p as any).supplier_name || '', phone: '', address: '', balance: 0 },
+      items: [],
+      subtotal: p.subtotal,
+      discount: p.discount_amount,
+      tax: p.tax_amount,
+      total: p.total_amount,
+      status: p.status,
+      payment_status: p.payment_status,
+      created_at: p.created_at,
+    }));
+  } catch {
+    purchases = [];
+  }
+  loadTab(currentTab);
 }
 
 function initTabs(): void {

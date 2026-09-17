@@ -1,3 +1,5 @@
+import { backupService } from '../services/backup.service';
+
 interface BackupEntry {
   id: number;
   filename: string;
@@ -8,14 +10,7 @@ interface BackupEntry {
   created_by: string;
 }
 
-const backups: BackupEntry[] = [
-  { id: 1, filename: 'backup_2026-09-13_14-00.sql', date: '2026-09-13T14:00:00', size: '2.4 MB', type: 'auto', status: 'completed', created_by: 'System' },
-  { id: 2, filename: 'backup_2026-09-13_08-00.sql', date: '2026-09-13T08:00:00', size: '2.3 MB', type: 'auto', status: 'completed', created_by: 'System' },
-  { id: 3, filename: 'backup_2026-09-12_14-00.sql', date: '2026-09-12T14:00:00', size: '2.2 MB', type: 'auto', status: 'completed', created_by: 'System' },
-  { id: 4, filename: 'manual_backup_2026-09-12.sql', date: '2026-09-12T10:30:00', size: '2.2 MB', type: 'manual', status: 'completed', created_by: 'Super Admin' },
-  { id: 5, filename: 'backup_2026-09-11_14-00.sql', date: '2026-09-11T14:00:00', size: '2.1 MB', type: 'auto', status: 'completed', created_by: 'System' },
-  { id: 6, filename: 'backup_2026-09-10_14-00.sql', date: '2026-09-10T14:00:00', size: '2.0 MB', type: 'auto', status: 'completed', created_by: 'System' },
-];
+let backups: BackupEntry[] = [];
 
 export function renderBackup(): string {
   return `
@@ -236,51 +231,36 @@ export function renderBackup(): string {
 }
 
 export function initBackup(): void {
+  loadBackups();
   document.getElementById('createBackupBtn')?.addEventListener('click', createBackup);
-  document.getElementById('saveBackupSettings')?.addEventListener('click', () => {
-    alert('Backup settings saved successfully!');
-  });
-
-  document.getElementById('downloadLatestBtn')?.addEventListener('click', () => {
-    alert('Downloading backup_2026-09-13_14-00.sql...');
-  });
-
-  document.getElementById('verifyBackupBtn')?.addEventListener('click', () => {
-    alert('Verifying backup integrity...\n\nAll backups are valid and intact!');
-  });
-
-  document.getElementById('cleanupBtn')?.addEventListener('click', () => {
-    alert('Cleaning up backups older than 14 days...\n\n2 old backups removed.');
-  });
-
-  document.getElementById('scheduleBtn')?.addEventListener('click', () => {
-    alert('Backup Schedule:\n\n• 08:00 - Auto Backup\n• 14:00 - Auto Backup\n\nNext: Today 20:00');
-  });
-
-  document.querySelectorAll('.download-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      alert('Downloading backup file...');
-    });
-  });
-
-  document.querySelectorAll('.restore-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (confirm('Are you sure you want to restore this backup?\n\nWARNING: This will overwrite current data!')) {
-        alert('Restoring backup...\n\nBackup restored successfully!');
-      }
-    });
-  });
-
-  document.querySelectorAll('.delete-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (confirm('Are you sure you want to delete this backup?')) {
-        alert('Backup deleted successfully!');
-      }
-    });
+  document.getElementById('saveBackupSettings')?.addEventListener('click', async () => {
+    try {
+      await backupService.updateSettings({ auto_backup: true, backup_frequency: 'twice_daily' });
+      alert('Backup settings saved successfully!');
+    } catch {
+      alert('Failed to save settings.');
+    }
   });
 }
 
-function createBackup(): void {
+async function loadBackups(): Promise<void> {
+  try {
+    const data = await backupService.getAll();
+    backups = (data || []).map((b: any) => ({
+      id: b.id,
+      filename: b.filename || b.name || '',
+      date: b.created_at || b.date || '',
+      size: b.size ? `${(b.size / 1024 / 1024).toFixed(1)} MB` : '0 MB',
+      type: b.type || 'manual',
+      status: b.status || 'completed',
+      created_by: b.created_by || 'System',
+    }));
+  } catch {
+    backups = [];
+  }
+}
+
+async function createBackup(): Promise<void> {
   const progressDiv = document.getElementById('backupProgress');
   const completeDiv = document.getElementById('backupComplete');
   const progressBar = document.getElementById('backupProgressBar') as HTMLElement;
@@ -314,10 +294,19 @@ function createBackup(): void {
       stageIndex++;
     } else {
       clearInterval(interval);
-      setTimeout(() => {
+      setTimeout(async () => {
         progressDiv.style.display = 'none';
         completeDiv.style.display = 'block';
+        await loadBackups();
       }, 500);
     }
   }, 800);
+
+  try {
+    await backupService.create();
+  } catch {
+    clearInterval(interval);
+    progressDiv.style.display = 'none';
+    alert('Backup failed. Please try again.');
+  }
 }

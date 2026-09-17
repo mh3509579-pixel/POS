@@ -1,3 +1,5 @@
+import { authService, User as ApiUser } from '../services/auth.service';
+
 interface User {
   id: number;
   name: string;
@@ -10,14 +12,7 @@ interface User {
   avatar: string;
 }
 
-const users: User[] = [
-  { id: 1, name: 'Super Admin', email: 'admin@hussainsons.com', phone: '0321-1234567', role: 'admin', status: 'active', last_login: '2026-09-13T10:30:00', created_at: '2024-01-01', avatar: 'SA' },
-  { id: 2, name: 'Ahmed Raza', email: 'ahmed.raza@hussainsons.com', phone: '0333-1234567', role: 'pharmacist', status: 'active', last_login: '2026-09-13T09:15:00', created_at: '2024-03-15', avatar: 'AR' },
-  { id: 3, name: 'Sara Bibi', email: 'sara@hussainsons.com', phone: '0300-1234567', role: 'cashier', status: 'active', last_login: '2026-09-12T18:00:00', created_at: '2024-06-20', avatar: 'SB' },
-  { id: 4, name: 'Usman Ali', email: 'usman@hussainsons.com', phone: '0311-1234567', role: 'inventory', status: 'active', last_login: '2026-09-11T16:45:00', created_at: '2025-01-10', avatar: 'UA' },
-  { id: 5, name: 'Fatima Noor', email: 'fatima@hussainsons.com', phone: '0322-1234567', role: 'accountant', status: 'active', last_login: '2026-09-10T14:30:00', created_at: '2025-04-05', avatar: 'FN' },
-  { id: 6, name: 'Hassan Shah', email: 'hassan@hussainsons.com', phone: '0345-1234567', role: 'cashier', status: 'inactive', last_login: '2026-08-15T12:00:00', created_at: '2025-06-01', avatar: 'HS' },
-];
+let users: User[] = [];
 
 const roles = [
   { name: 'admin', label: 'Admin', color: 'danger', permissions: ['Full System Access', 'Manage Users', 'Settings', 'All Reports'] },
@@ -170,7 +165,7 @@ export function renderUsers(): string {
 }
 
 export function initUsers(): void {
-  renderTable();
+  loadUsers();
   
   document.getElementById('searchUser')?.addEventListener('input', renderTable);
   document.getElementById('filterRole')?.addEventListener('change', renderTable);
@@ -183,6 +178,26 @@ export function initUsers(): void {
   });
 
   document.getElementById('addUserBtn')?.addEventListener('click', () => showUserModal());
+}
+
+async function loadUsers(): Promise<void> {
+  try {
+    const data = await authService.getAllUsers();
+    users = data.map((u) => ({
+      id: u.id,
+      name: u.full_name || u.username,
+      email: u.email,
+      phone: u.phone || '',
+      role: u.role_name || 'user',
+      status: u.is_active ? 'active' : 'inactive',
+      last_login: '',
+      created_at: '',
+      avatar: (u.full_name || u.username).split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
+    }));
+  } catch {
+    users = [];
+  }
+  renderTable();
 }
 
 function renderTable(): void {

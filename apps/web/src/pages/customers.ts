@@ -27,94 +27,8 @@ interface CustomerTransaction {
   balance: number;
 }
 
-const customers: Customer[] = [
-  {
-    id: 1,
-    name: 'Ahmed Khan',
-    phone: '0321-1234567',
-    email: 'ahmed.khan@email.com',
-    address: 'Gulshan-e-Iqbal, Karachi',
-    cnic: '42101-1234567-8',
-    type: 'regular',
-    credit_limit: 50000,
-    balance: 2500,
-    total_purchases: 125000,
-    last_purchase: '2026-09-13',
-    created_at: '2025-01-15',
-  },
-  {
-    id: 2,
-    name: 'Fatima Shah',
-    phone: '0333-7654321',
-    email: 'fatima.shah@email.com',
-    address: 'DHA Phase 5, Karachi',
-    cnic: '42101-7654321-5',
-    type: 'premium',
-    credit_limit: 100000,
-    balance: 0,
-    total_purchases: 380000,
-    last_purchase: '2026-09-12',
-    created_at: '2024-06-20',
-  },
-  {
-    id: 3,
-    name: 'Ali Hassan',
-    phone: '0300-1234567',
-    email: 'ali.hassan@email.com',
-    address: 'North Nazimabad, Karachi',
-    cnic: '42101-3216549-7',
-    type: 'regular',
-    credit_limit: 30000,
-    balance: 4500,
-    total_purchases: 87000,
-    last_purchase: '2026-09-11',
-    created_at: '2025-03-10',
-  },
-  {
-    id: 4,
-    name: 'MedCity Hospital',
-    phone: '021-34567890',
-    email: 'procurement@medcity.pk',
-    address: 'Saddar, Karachi',
-    cnic: '',
-    type: 'wholesale',
-    credit_limit: 500000,
-    balance: 125000,
-    total_purchases: 2500000,
-    last_purchase: '2026-09-10',
-    created_at: '2024-01-01',
-  },
-  {
-    id: 5,
-    name: 'Sara Malik',
-    phone: '0311-9876543',
-    email: 'sara.malik@email.com',
-    address: 'Clifton, Karachi',
-    cnic: '42101-9871234-2',
-    type: 'premium',
-    credit_limit: 75000,
-    balance: 0,
-    total_purchases: 195000,
-    last_purchase: '2026-09-09',
-    created_at: '2024-09-05',
-  },
-  {
-    id: 6,
-    name: 'Kamran Brothers Pharmacy',
-    phone: '021-56789012',
-    email: 'kb.pharmacy@email.com',
-    address: 'Tariq Road, Karachi',
-    cnic: '',
-    type: 'wholesale',
-    credit_limit: 300000,
-    balance: 45000,
-    total_purchases: 1800000,
-    last_purchase: '2026-09-08',
-    created_at: '2024-02-15',
-  },
-];
-
-let filteredCustomers = [...customers];
+let customers: Customer[] = [];
+let filteredCustomers: Customer[] = [];
 
 export function renderCustomers(): string {
   return `
@@ -130,12 +44,12 @@ export function renderCustomers(): string {
       </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" id="customerStats">
       <div class="col-md-3">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">${customers.length}</div>
+              <div class="stat-value" id="statTotal">0</div>
               <div class="stat-label">Total Customers</div>
             </div>
             <div class="stat-icon blue"><i class="bi bi-people"></i></div>
@@ -146,7 +60,7 @@ export function renderCustomers(): string {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">${customers.filter((c) => c.type === 'premium').length}</div>
+              <div class="stat-value" id="statPremium">0</div>
               <div class="stat-label">Premium Customers</div>
             </div>
             <div class="stat-icon orange"><i class="bi bi-star"></i></div>
@@ -157,7 +71,7 @@ export function renderCustomers(): string {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ ${customers.reduce((sum, c) => sum + c.balance, 0).toLocaleString()}</div>
+              <div class="stat-value" id="statReceivable">₨ 0</div>
               <div class="stat-label">Total Receivable</div>
             </div>
             <div class="stat-icon red"><i class="bi bi-wallet2"></i></div>
@@ -168,7 +82,7 @@ export function renderCustomers(): string {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ ${customers.reduce((sum, c) => sum + c.total_purchases, 0).toLocaleString()}</div>
+              <div class="stat-value" id="statSales">₨ 0</div>
               <div class="stat-label">Total Sales</div>
             </div>
             <div class="stat-icon green"><i class="bi bi-graph-up"></i></div>
@@ -183,17 +97,7 @@ export function renderCustomers(): string {
           <div class="card-header">
             <h6 class="mb-0">Customer Types Distribution</h6>
           </div>
-          <div class="card-body">
-            ${createDonutChart({
-              labels: ['Regular', 'Premium', 'Wholesale'],
-              values: [
-                customers.filter((c) => c.type === 'regular').length,
-                customers.filter((c) => c.type === 'premium').length,
-                customers.filter((c) => c.type === 'wholesale').length,
-              ],
-              colors: ['#0d6efd', '#ffc107', '#198754']
-            }, 160)}
-          </div>
+          <div class="card-body" id="customerTypeChart"></div>
         </div>
       </div>
       <div class="col-md-6">
@@ -201,18 +105,20 @@ export function renderCustomers(): string {
           <div class="card-header">
             <h6 class="mb-0">Top Customers by Purchases</h6>
           </div>
-          <div class="card-body">
-            ${createHorizontalBarChart({
-              labels: customers.sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5).map((c) => c.name.length > 15 ? c.name.slice(0, 15) + '...' : c.name),
-              values: customers.sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5).map((c) => c.total_purchases),
-              colors: ['#198754', '#0d6efd', '#ffc107', '#0dcaf0', '#6c757d']
-            }, 160)}
-          </div>
+          <div class="card-body" id="topCustomersChart"></div>
         </div>
       </div>
     </div>
 
     <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" id="searchCustomer" placeholder="Search customers...">
+            </div>
+          </div>
           <div class="col-md-2">
             <select class="form-select" id="filterType">
               <option value="">All Types</option>
@@ -252,41 +158,86 @@ export function renderCustomers(): string {
       </div>
     </div>
 
-    <div id="customerView">
-    </div>
+    <div id="customerView"></div>
   `;
 }
 
-export function initCustomers(): void {
-  // Try loading from API
-  customerService.getAll({ limit: 100 }).then(({ data }) => {
-    if (data && data.length > 0) {
-      customers.length = 0;
-      data.forEach((c) => {
-        customers.push({
-          id: c.id,
-          name: c.name,
-          phone: c.phone || '',
-          email: c.email || '',
-          address: c.address || '',
-          cnic: '',
-          type: c.type as 'regular' | 'premium' | 'wholesale',
-          credit_limit: c.credit_limit,
-          balance: c.current_balance,
-          total_purchases: c.total_purchases,
-          last_purchase: c.updated_at,
-          created_at: c.created_at,
-        });
-      });
-      filteredCustomers = [...customers];
-      renderView();
-    }
-  }).catch(() => {
-    // Fallback to local data (already initialized)
-  });
+function renderStats(): void {
+  const total = customers.length;
+  const premium = customers.filter((c) => c.type === 'premium').length;
+  const receivable = customers.reduce((sum, c) => sum + c.balance, 0);
+  const sales = customers.reduce((sum, c) => sum + c.total_purchases, 0);
 
-  renderView();
+  const totalEl = document.getElementById('statTotal');
+  const premiumEl = document.getElementById('statPremium');
+  const receivableEl = document.getElementById('statReceivable');
+  const salesEl = document.getElementById('statSales');
+
+  if (totalEl) totalEl.textContent = String(total);
+  if (premiumEl) premiumEl.textContent = String(premium);
+  if (receivableEl) receivableEl.textContent = `₨ ${receivable.toLocaleString()}`;
+  if (salesEl) salesEl.textContent = `₨ ${sales.toLocaleString()}`;
+}
+
+function renderCharts(): void {
+  const typeChart = document.getElementById('customerTypeChart');
+  const topChart = document.getElementById('topCustomersChart');
+
+  if (typeChart) {
+    typeChart.innerHTML = createDonutChart({
+      labels: ['Regular', 'Premium', 'Wholesale'],
+      values: [
+        customers.filter((c) => c.type === 'regular').length,
+        customers.filter((c) => c.type === 'premium').length,
+        customers.filter((c) => c.type === 'wholesale').length,
+      ],
+      colors: ['#0d6efd', '#ffc107', '#198754']
+    }, 160);
+  }
+
+  if (topChart) {
+    const sorted = [...customers].sort((a, b) => b.total_purchases - a.total_purchases).slice(0, 5);
+    topChart.innerHTML = createHorizontalBarChart({
+      labels: sorted.map((c) => c.name.length > 15 ? c.name.slice(0, 15) + '...' : c.name),
+      values: sorted.map((c) => c.total_purchases),
+      colors: ['#198754', '#0d6efd', '#ffc107', '#0dcaf0', '#6c757d']
+    }, 160);
+  }
+}
+
+export function initCustomers(): void {
+  loadCustomers();
   initEventListeners();
+}
+
+async function loadCustomers(): Promise<void> {
+  try {
+    const { data } = await customerService.getAll({ limit: 500 });
+    customers = data.map((c) => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone || '',
+      email: c.email || '',
+      address: c.address || '',
+      cnic: '',
+      type: c.type as 'regular' | 'premium' | 'wholesale',
+      credit_limit: c.credit_limit,
+      balance: c.current_balance,
+      total_purchases: c.total_purchases,
+      last_purchase: c.updated_at,
+      created_at: c.created_at,
+    }));
+    filteredCustomers = [...customers];
+    renderStats();
+    renderCharts();
+    renderView();
+  } catch {
+    customers = [];
+    filteredCustomers = [];
+    renderStats();
+    renderCharts();
+    renderView();
+  }
 }
 
 function initEventListeners(): void {
@@ -664,55 +615,34 @@ function showCustomerModal(editId?: number): void {
     if (e.target === modal) modal.remove();
   });
 
-  modal.querySelector('#saveCustomerBtn')?.addEventListener('click', () => {
+  modal.querySelector('#saveCustomerBtn')?.addEventListener('click', async () => {
     const name = (modal.querySelector('#custName') as HTMLInputElement).value;
     const phone = (modal.querySelector('#custPhone') as HTMLInputElement).value;
     const email = (modal.querySelector('#custEmail') as HTMLInputElement).value;
-    const cnic = (modal.querySelector('#custCnic') as HTMLInputElement).value;
     const address = (modal.querySelector('#custAddress') as HTMLTextAreaElement).value;
     const type = (modal.querySelector('#custType') as HTMLSelectElement).value as Customer['type'];
     const creditLimit = parseInt((modal.querySelector('#custCreditLimit') as HTMLInputElement).value) || 50000;
-    const balance = parseInt((modal.querySelector('#custBalance') as HTMLInputElement).value) || 0;
 
     if (!name || !phone) {
       alert('Please fill required fields (Name, Phone)');
       return;
     }
 
-    if (isEdit && customer) {
-      customer.name = name;
-      customer.phone = phone;
-      customer.email = email;
-      customer.cnic = cnic;
-      customer.address = address;
-      customer.type = type;
-      customer.credit_limit = creditLimit;
-      alert('Customer updated successfully!');
-    } else {
-      customers.push({
-        id: customers.length + 1,
-        name,
-        phone,
-        email,
-        cnic,
-        address,
-        type,
-        credit_limit: creditLimit,
-        balance,
-        total_purchases: 0,
-        last_purchase: '',
-        created_at: new Date().toISOString().split('T')[0],
-      });
-      alert('Customer added successfully!');
+    try {
+      if (isEdit && customer) {
+        await customerService.update(customer.id, { name, phone, email, address, type, credit_limit: creditLimit });
+      } else {
+        await customerService.create({ name, phone, email, address, type, credit_limit: creditLimit });
+      }
+      modal.remove();
+      await loadCustomers();
+    } catch (err) {
+      alert('Failed to save customer. Please try again.');
     }
-
-    filteredCustomers = [...customers];
-    renderView();
-    modal.remove();
   });
 }
 
-function deleteCustomer(id: number): void {
+async function deleteCustomer(id: number): Promise<void> {
   const customer = customers.find((c) => c.id === id);
   if (!customer) return;
 
@@ -722,11 +652,12 @@ function deleteCustomer(id: number): void {
   }
 
   if (confirm(`Are you sure you want to delete "${customer.name}"?`)) {
-    const index = customers.findIndex((c) => c.id === id);
-    customers.splice(index, 1);
-    filteredCustomers = [...customers];
-    renderView();
-    alert('Customer deleted successfully!');
+    try {
+      await customerService.delete(id);
+      await loadCustomers();
+    } catch {
+      alert('Failed to delete customer. Please try again.');
+    }
   }
 }
 

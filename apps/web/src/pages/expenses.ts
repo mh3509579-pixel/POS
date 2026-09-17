@@ -1,4 +1,5 @@
 import { createBarChart, createDonutChart } from '../utils/charts';
+import { expenseService, Expense as ApiExpense, ExpenseCategory as ApiExpenseCategory } from '../services/expense.service';
 
 interface Expense {
   id: number;
@@ -27,32 +28,8 @@ interface ExpenseCategory {
 
 type ExpensesTab = 'list' | 'categories' | 'reports';
 
-const expenseCategories: ExpenseCategory[] = [
-  { id: 1, name: 'Rent', description: 'Shop and warehouse rent', budget: 50000, spent: 50000, icon: 'bi-building', color: 'primary' },
-  { id: 2, name: 'Utilities', description: 'Electricity, water, gas', budget: 15000, spent: 12500, icon: 'bi-lightning', color: 'warning' },
-  { id: 3, name: 'Salaries', description: 'Staff salaries and wages', budget: 120000, spent: 120000, icon: 'bi-people', color: 'success' },
-  { id: 4, name: 'Marketing', description: 'Advertising and promotions', budget: 20000, spent: 8500, icon: 'bi-megaphone', color: 'info' },
-  { id: 5, name: 'Maintenance', description: 'Equipment and shop maintenance', budget: 10000, spent: 4500, icon: 'bi-tools', color: 'secondary' },
-  { id: 6, name: 'Office Supplies', description: 'Stationery and office items', budget: 5000, spent: 2200, icon: 'bi-pencil-square', color: 'dark' },
-  { id: 7, name: 'Transport', description: 'Delivery and logistics', budget: 8000, spent: 5800, icon: 'bi-truck', color: 'danger' },
-  { id: 8, name: 'Insurance', description: 'Business and inventory insurance', budget: 12000, spent: 12000, icon: 'bi-shield-check', color: 'primary' },
-  { id: 9, name: 'Tax', description: 'Government taxes and fees', budget: 25000, spent: 25000, icon: 'bi-file-earmark-text', color: 'warning' },
-  { id: 10, name: 'Miscellaneous', description: 'Other expenses', budget: 10000, spent: 3500, icon: 'bi-three-dots', color: 'secondary' },
-];
-
-const expenses: Expense[] = [
-  { id: 1, date: '2026-09-13', category: 'Rent', subcategory: 'Shop Rent', description: 'September 2026 shop rent', amount: 50000, payment_method: 'bank', reference: 'EXP-2026-001', vendor: 'Property Owner', status: 'approved', approved_by: 'Admin', created_at: '2026-09-13' },
-  { id: 2, date: '2026-09-12', category: 'Utilities', subcategory: 'Electricity', description: 'KElectric bill - September', amount: 8500, payment_method: 'cash', reference: 'EXP-2026-002', vendor: 'KElectric', status: 'approved', approved_by: 'Admin', created_at: '2026-09-12' },
-  { id: 3, date: '2026-09-12', category: 'Utilities', subcategory: 'Water', description: 'Water bill - September', amount: 2000, payment_method: 'cash', reference: 'EXP-2026-003', vendor: 'KWSC', status: 'approved', approved_by: 'Admin', created_at: '2026-09-12' },
-  { id: 4, date: '2026-09-10', category: 'Salaries', subcategory: 'Staff Salary', description: 'September staff salaries', amount: 120000, payment_method: 'bank', reference: 'EXP-2026-004', vendor: 'Staff', status: 'approved', approved_by: 'Admin', created_at: '2026-09-10' },
-  { id: 5, date: '2026-09-08', category: 'Marketing', subcategory: 'Online Ads', description: 'Facebook ads campaign', amount: 5000, payment_method: 'card', reference: 'EXP-2026-005', vendor: 'Facebook', status: 'approved', approved_by: 'Admin', created_at: '2026-09-08' },
-  { id: 6, date: '2026-09-07', category: 'Transport', subcategory: 'Delivery', description: 'Medicine delivery charges', amount: 1500, payment_method: 'cash', reference: 'EXP-2026-006', vendor: 'Courier Service', status: 'approved', approved_by: 'Admin', created_at: '2026-09-07' },
-  { id: 7, date: '2026-09-05', category: 'Maintenance', subcategory: 'AC Service', description: 'AC maintenance and gas refill', amount: 3500, payment_method: 'cash', reference: 'EXP-2026-007', vendor: 'AC Tech Services', status: 'approved', approved_by: 'Admin', created_at: '2026-09-05' },
-  { id: 8, date: '2026-09-03', category: 'Office Supplies', subcategory: 'Stationery', description: 'Printer paper and ink', amount: 1200, payment_method: 'cash', reference: 'EXP-2026-008', vendor: 'Office Mart', status: 'approved', approved_by: 'Admin', created_at: '2026-09-03' },
-  { id: 9, date: '2026-09-01', category: 'Insurance', subcategory: 'Business Insurance', description: 'Quarterly insurance premium', amount: 12000, payment_method: 'bank', reference: 'EXP-2026-009', vendor: 'State Insurance', status: 'approved', approved_by: 'Admin', created_at: '2026-09-01' },
-  { id: 10, date: '2026-09-01', category: 'Tax', subcategory: 'GST Payment', description: 'August GST filing', amount: 25000, payment_method: 'bank', reference: 'EXP-2026-010', vendor: 'FBR', status: 'approved', approved_by: 'Admin', created_at: '2026-09-01' },
-];
-
+let expenseCategories: ExpenseCategory[] = [];
+let expenses: Expense[] = [];
 let currentTab: ExpensesTab = 'list';
 
 export function renderExpenses(): string {
@@ -87,11 +64,34 @@ export function renderExpenses(): string {
 }
 
 export function initExpenses(): void {
-  loadTab('list');
+  loadExpenses();
   initTabs();
   document.getElementById('addExpenseBtn')?.addEventListener('click', () => {
     showExpenseModal();
   });
+}
+
+async function loadExpenses(): Promise<void> {
+  try {
+    const { data } = await expenseService.getAll(500);
+    expenses = data.map((e) => ({
+      id: e.id,
+      date: e.expense_date,
+      category: e.category_name || 'Miscellaneous',
+      subcategory: '',
+      description: e.description,
+      amount: e.amount,
+      payment_method: e.payment_method === 'bank_transfer' ? 'bank' : e.payment_method,
+      reference: e.expense_number || '',
+      vendor: '',
+      status: 'approved',
+      approved_by: 'Admin',
+      created_at: e.created_at,
+    }));
+  } catch {
+    expenses = [];
+  }
+  loadTab(currentTab);
 }
 
 function initTabs(): void {
@@ -493,58 +493,43 @@ function showExpenseModal(editId?: number): void {
     if (e.target === modal) modal.remove();
   });
 
-  modal.querySelector('#saveExpenseBtn')?.addEventListener('click', () => {
+  modal.querySelector('#saveExpenseBtn')?.addEventListener('click', async () => {
     const date = (modal.querySelector('#expDate') as HTMLInputElement).value;
     const category = (modal.querySelector('#expCategory') as HTMLSelectElement).value;
-    const subcategory = (modal.querySelector('#expSubcategory') as HTMLInputElement).value;
     const amount = parseInt((modal.querySelector('#expAmount') as HTMLInputElement).value) || 0;
     const description = (modal.querySelector('#expDescription') as HTMLTextAreaElement).value;
-    const vendor = (modal.querySelector('#expVendor') as HTMLInputElement).value;
     const payment_method = (modal.querySelector('#expPayment') as HTMLSelectElement).value;
     const reference = (modal.querySelector('#expReference') as HTMLInputElement).value;
-    const status = (modal.querySelector('#expStatus') as HTMLSelectElement).value;
 
     if (!date || !category || !amount || !description) {
       alert('Please fill required fields');
       return;
     }
 
-    if (isEdit && expense) {
-      expense.date = date;
-      expense.category = category;
-      expense.subcategory = subcategory;
-      expense.amount = amount;
-      expense.description = description;
-      expense.vendor = vendor;
-      expense.payment_method = payment_method;
-      expense.reference = reference;
-      expense.status = status;
-      alert('Expense updated successfully!');
-    } else {
-      expenses.unshift({
-        id: expenses.length + 1,
-        date,
-        category,
-        subcategory,
-        description,
-        amount,
-        payment_method,
-        reference: reference || `EXP-2026-${String(expenses.length + 1).padStart(3, '0')}`,
-        vendor,
-        status,
-        approved_by: status === 'approved' ? 'Admin' : '',
-        created_at: new Date().toISOString(),
-      });
-      
-      // Update category spent
-      const cat = expenseCategories.find((c) => c.name === category);
-      if (cat) cat.spent += amount;
-      
-      alert('Expense added successfully!');
+    try {
+      if (isEdit && expense) {
+        await expenseService.update(expense.id, {
+          amount,
+          description,
+          expense_date: date,
+          payment_method: payment_method as any,
+          receipt_number: reference || undefined,
+        });
+      } else {
+        await expenseService.create({
+          category_id: 1,
+          amount,
+          description,
+          expense_date: date,
+          payment_method: payment_method as any,
+          receipt_number: reference || undefined,
+        });
+      }
+      modal.remove();
+      await loadExpenses();
+    } catch {
+      alert('Failed to save expense. Please try again.');
     }
-
-    renderTable();
-    modal.remove();
   });
 }
 
@@ -645,20 +630,17 @@ function viewExpense(id: number): void {
   });
 }
 
-function deleteExpense(id: number): void {
+async function deleteExpense(id: number): Promise<void> {
   const expense = expenses.find((e) => e.id === id);
   if (!expense) return;
 
   if (confirm(`Are you sure you want to delete this expense?\n\n"${expense.description}"\nAmount: ₨ ${expense.amount.toLocaleString()}`)) {
-    const index = expenses.findIndex((e) => e.id === id);
-    expenses.splice(index, 1);
-    
-    // Update category spent
-    const cat = expenseCategories.find((c) => c.name === expense.category);
-    if (cat) cat.spent -= expense.amount;
-    
-    renderTable();
-    alert('Expense deleted successfully!');
+    try {
+      await expenseService.delete(id);
+      await loadExpenses();
+    } catch {
+      alert('Failed to delete expense. Please try again.');
+    }
   }
 }
 

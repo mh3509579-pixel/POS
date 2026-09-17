@@ -1,4 +1,5 @@
 import { createLineChart, createDonutChart } from '../utils/charts';
+import { salesService, Sale as ApiSale } from '../services/sales.service';
 
 type SalesTab = 'list' | 'returns';
 
@@ -30,107 +31,7 @@ interface Sale {
   created_at: string;
 }
 
-const salesData: Sale[] = [
-  {
-    id: 1,
-    invoice_number: 'INV-2026-000001',
-    customer_name: 'Walk-in Customer',
-    customer_phone: '',
-    items: [
-      { medicine_id: 1, medicine_name: 'Paracetamol 500mg', batch: 'P001', quantity: 2, unit_price: 50, discount: 0, total: 100 },
-      { medicine_id: 3, medicine_name: 'Cetirizine 10mg', batch: 'C001', quantity: 1, unit_price: 35, discount: 0, total: 35 },
-    ],
-    subtotal: 135,
-    discount: 0,
-    tax: 6.75,
-    total: 141.75,
-    amount_paid: 150,
-    change_amount: 8.25,
-    payment_method: 'cash',
-    status: 'completed',
-    cashier: 'Super Admin',
-    created_at: '2026-09-13T10:30:00',
-  },
-  {
-    id: 2,
-    invoice_number: 'INV-2026-000002',
-    customer_name: 'Ahmed Khan',
-    customer_phone: '0321-1234567',
-    items: [
-      { medicine_id: 6, medicine_name: 'Augmentin 625mg', batch: 'AU01', quantity: 1, unit_price: 280, discount: 0, total: 280 },
-      { medicine_id: 15, medicine_name: 'Cough Syrup', batch: 'CS01', quantity: 2, unit_price: 120, discount: 10, total: 230 },
-    ],
-    subtotal: 510,
-    discount: 10,
-    tax: 25,
-    total: 525,
-    amount_paid: 525,
-    change_amount: 0,
-    payment_method: 'card',
-    status: 'completed',
-    cashier: 'Super Admin',
-    created_at: '2026-09-13T11:45:00',
-  },
-  {
-    id: 3,
-    invoice_number: 'INV-2026-000003',
-    customer_name: 'Fatima Shah',
-    customer_phone: '0333-7654321',
-    items: [
-      { medicine_id: 7, medicine_name: 'Nexium 40mg', batch: 'N001', quantity: 1, unit_price: 450, discount: 0, total: 450 },
-      { medicine_id: 8, medicine_name: 'Glucophage 500mg', batch: 'G001', quantity: 2, unit_price: 85, discount: 0, total: 170 },
-    ],
-    subtotal: 620,
-    discount: 20,
-    tax: 30,
-    total: 630,
-    amount_paid: 600,
-    change_amount: 0,
-    payment_method: 'cash',
-    status: 'completed',
-    cashier: 'Super Admin',
-    created_at: '2026-09-12T14:20:00',
-  },
-  {
-    id: 4,
-    invoice_number: 'INV-2026-000004',
-    customer_name: 'Walk-in Customer',
-    customer_phone: '',
-    items: [
-      { medicine_id: 5, medicine_name: 'Brufen 400mg', batch: 'B001', quantity: 3, unit_price: 55, discount: 0, total: 165 },
-    ],
-    subtotal: 165,
-    discount: 0,
-    tax: 8.25,
-    total: 173.25,
-    amount_paid: 200,
-    change_amount: 26.75,
-    payment_method: 'cash',
-    status: 'completed',
-    cashier: 'Super Admin',
-    created_at: '2026-09-12T09:15:00',
-  },
-  {
-    id: 5,
-    invoice_number: 'INV-2026-000005',
-    customer_name: 'Ali Hassan',
-    customer_phone: '0300-1234567',
-    items: [
-      { medicine_id: 10, medicine_name: 'Atorvastatin 20mg', batch: 'AT01', quantity: 1, unit_price: 110, discount: 0, total: 110 },
-      { medicine_id: 14, medicine_name: 'Amlodipine 5mg', batch: 'AM01', quantity: 1, unit_price: 50, discount: 0, total: 50 },
-    ],
-    subtotal: 160,
-    discount: 0,
-    tax: 8,
-    total: 168,
-    amount_paid: 168,
-    change_amount: 0,
-    payment_method: 'card',
-    status: 'completed',
-    cashier: 'Super Admin',
-    created_at: '2026-09-11T16:00:00',
-  },
-];
+let salesData: Sale[] = [];
 
 let currentTab: SalesTab = 'list';
 
@@ -156,8 +57,34 @@ export function renderSales(): string {
 }
 
 export function initSales(): void {
-  loadTab('list');
+  loadSales();
   initTabs();
+}
+
+async function loadSales(): Promise<void> {
+  try {
+    const { data } = await salesService.getAll(500);
+    salesData = data.map((s) => ({
+      id: s.id,
+      invoice_number: s.invoice_number,
+      customer_name: (s as any).customer_name || 'Walk-in Customer',
+      customer_phone: '',
+      items: [],
+      subtotal: s.subtotal,
+      discount: s.discount_amount,
+      tax: s.tax_amount,
+      total: s.total_amount,
+      amount_paid: s.paid_amount,
+      change_amount: s.change_amount,
+      payment_method: s.payment_method,
+      status: s.status,
+      cashier: (s as any).user_name || '',
+      created_at: s.created_at,
+    }));
+  } catch {
+    salesData = [];
+  }
+  loadTab(currentTab);
 }
 
 function initTabs(): void {
