@@ -110,6 +110,20 @@ class AuthService {
     const response = await api.get<{ status: string; data: { id: number; name: string; description: string }[] }>('/auth/roles');
     return response.data.data;
   }
+
+  async createUser(data: { username: string; email: string; password: string; full_name: string; phone?: string; role_id: number }): Promise<User> {
+    const response = await api.post<{ status: string; data: User }>('/auth/register', data);
+    return response.data.data;
+  }
+
+  async updateUser(id: number, data: { email?: string; full_name?: string; phone?: string; role_id?: number; is_active?: boolean }): Promise<User> {
+    const response = await api.put<{ status: string; data: User }>(`/auth/users/${id}`, data);
+    return response.data.data;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await api.delete(`/auth/users/${id}`);
+  }
 }
 
 export const authService = new AuthService();

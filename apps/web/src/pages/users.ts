@@ -6,21 +6,29 @@ interface User {
   email: string;
   phone: string;
   role: string;
+  role_id: number;
   status: string;
   last_login: string;
-  created_at: string;
   avatar: string;
 }
 
-let users: User[] = [];
+interface Role {
+  id: number;
+  name: string;
+  label: string;
+  color: string;
+  description: string;
+  permissions: string[];
+}
 
-const roles = [
-  { name: 'admin', label: 'Admin', color: 'danger', permissions: ['Full System Access', 'Manage Users', 'Settings', 'All Reports'] },
-  { name: 'pharmacist', label: 'Pharmacist', color: 'primary', permissions: ['POS', 'Medicines', 'Inventory', 'Sales', 'Purchases'] },
-  { name: 'cashier', label: 'Cashier', color: 'success', permissions: ['POS', 'Sales', 'Customers'] },
-  { name: 'inventory', label: 'Inventory Manager', color: 'warning', permissions: ['Inventory', 'Purchases', 'Medicines'] },
-  { name: 'accountant', label: 'Accountant', color: 'info', permissions: ['Chart of Accounts', 'Journal Entries', 'Reports', 'Expenses'] },
-];
+let users: User[] = [];
+let roles: Role[] = [];
+
+const roleConfig: Record<string, { label: string; color: string; permissions: string[] }> = {
+  admin: { label: 'Admin', color: 'danger', permissions: ['Full System Access', 'Manage Users', 'Settings', 'All Reports'] },
+  stock_manager: { label: 'Stock Manager', color: 'warning', permissions: ['Medicines', 'Inventory', 'Purchases', 'Suppliers'] },
+  cashier: { label: 'Cashier', color: 'success', permissions: ['POS', 'Medicines View', 'Customers'] },
+};
 
 export function renderUsers(): string {
   return `
@@ -166,7 +174,8 @@ export function renderUsers(): string {
 
 export function initUsers(): void {
   loadUsers();
-  
+  loadRoles();
+
   document.getElementById('searchUser')?.addEventListener('input', renderTable);
   document.getElementById('filterRole')?.addEventListener('change', renderTable);
   document.getElementById('filterStatus')?.addEventListener('change', renderTable);
@@ -180,6 +189,31 @@ export function initUsers(): void {
   document.getElementById('addUserBtn')?.addEventListener('click', () => showUserModal());
 }
 
+async function loadRoles(): Promise<void> {
+  try {
+    const data = await authService.getAllRoles();
+    roles = data
+      .filter((r) => r.name !== 'SUPER_ADMIN')
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        label: roleConfig[r.name]?.label || r.name,
+        color: roleConfig[r.name]?.color || 'secondary',
+        description: r.description || '',
+        permissions: roleConfig[r.name]?.permissions || [],
+      }));
+  } catch {
+    roles = Object.entries(roleConfig).map(([name, cfg], i) => ({
+      id: i + 1,
+      name,
+      label: cfg.label,
+      color: cfg.color,
+      description: '',
+      permissions: cfg.permissions,
+    }));
+  }
+}
+
 async function loadUsers(): Promise<void> {
   try {
     const data = await authService.getAllUsers();
@@ -189,9 +223,9 @@ async function loadUsers(): Promise<void> {
       email: u.email,
       phone: u.phone || '',
       role: u.role_name || 'user',
+      role_id: u.role_id,
       status: u.is_active ? 'active' : 'inactive',
       last_login: '',
-      created_at: '',
       avatar: (u.full_name || u.username).split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
     }));
   } catch {
@@ -217,18 +251,14 @@ function renderTable(): void {
 
   const roleColors: Record<string, string> = {
     admin: 'danger',
-    pharmacist: 'primary',
+    stock_manager: 'warning',
     cashier: 'success',
-    inventory: 'warning',
-    accountant: 'info',
   };
 
   const avatarColors: Record<string, string> = {
     admin: 'bg-danger',
-    pharmacist: 'bg-primary',
+    stock_manager: 'bg-warning',
     cashier: 'bg-success',
-    inventory: 'bg-warning',
-    accountant: 'bg-info',
   };
 
   if (filtered.length === 0) {
@@ -260,14 +290,11 @@ function renderTable(): void {
       </td>
       <td><span class="badge bg-${roleColors[u.role] || 'secondary'} text-capitalize">${u.role}</span></td>
       <td><span class="badge-status ${u.status === 'active' ? 'badge-success' : 'badge-secondary'} text-capitalize">${u.status}</span></td>
-      <td>${new Date(u.last_login).toLocaleString()}</td>
+      <td>${u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</td>
       <td class="text-end">
         <div class="btn-group btn-group-sm">
           <button class="btn btn-outline-secondary edit-btn" data-id="${u.id}" title="Edit">
             <i class="bi bi-pencil"></i>
-          </button>
-          <button class="btn btn-outline-secondary reset-btn" data-id="${u.id}" title="Reset Password">
-            <i class="bi bi-key"></i>
           </button>
           <button class="btn btn-outline-danger toggle-btn" data-id="${u.id}" title="${u.status === 'active' ? 'Deactivate' : 'Activate'}">
             <i class="bi bi-${u.status === 'active' ? 'person-x' : 'person-check'}"></i>
@@ -284,25 +311,19 @@ function renderTable(): void {
     });
   });
 
-  tbody.querySelectorAll('.reset-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = parseInt(btn.getAttribute('data-id') || '0');
-      const user = users.find((u) => u.id === id);
-      if (user && confirm(`Reset password for "${user.name}"?`)) {
-        alert(`Password reset email sent to ${user.email}`);
-      }
-    });
-  });
-
   tbody.querySelectorAll('.toggle-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const id = parseInt(btn.getAttribute('data-id') || '0');
       const user = users.find((u) => u.id === id);
       if (user) {
-        const newStatus = user.status === 'active' ? 'inactive' : 'active';
-        if (confirm(`${newStatus === 'active' ? 'Activate' : 'Deactivate'} user "${user.name}"?`)) {
-          user.status = newStatus;
-          renderTable();
+        const newActive = user.status !== 'active';
+        if (confirm(`${newActive ? 'Activate' : 'Deactivate'} user "${user.name}"?`)) {
+          try {
+            await authService.updateUser(id, { is_active: newActive });
+            await loadUsers();
+          } catch {
+            alert('Failed to update user status');
+          }
         }
       }
     });
@@ -334,32 +355,25 @@ function showUserModal(editId?: number): void {
                 <input type="email" class="form-control" id="userEmail" required value="${user?.email || ''}">
               </div>
               <div class="col-md-6">
-                <label class="form-label">Phone *</label>
-                <input type="tel" class="form-control" id="userPhone" required value="${user?.phone || ''}">
+                <label class="form-label">Phone</label>
+                <input type="tel" class="form-control" id="userPhone" value="${user?.phone || ''}">
               </div>
               <div class="col-md-6">
                 <label class="form-label">Role *</label>
                 <select class="form-select" id="userRole" required>
-                  ${roles.map((r) => `<option value="${r.name}" ${user?.role === r.name ? 'selected' : ''}>${r.label}</option>`).join('')}
+                  ${roles.map((r) => `<option value="${r.id}" ${user?.role_id === r.id ? 'selected' : ''}>${r.label}</option>`).join('')}
                 </select>
               </div>
               ${!isEdit ? `
                 <div class="col-md-6">
+                  <label class="form-label">Username *</label>
+                  <input type="text" class="form-control" id="userUsername" required>
+                </div>
+                <div class="col-md-6">
                   <label class="form-label">Password *</label>
                   <input type="password" class="form-control" id="userPassword" required>
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label">Confirm Password *</label>
-                  <input type="password" class="form-control" id="userConfirmPassword" required>
-                </div>
               ` : ''}
-              <div class="col-md-6">
-                <label class="form-label">Status</label>
-                <select class="form-select" id="userStatus">
-                  <option value="active" ${user?.status === 'active' ? 'selected' : ''}>Active</option>
-                  <option value="inactive" ${user?.status === 'inactive' ? 'selected' : ''}>Inactive</option>
-                </select>
-              </div>
             </div>
           </form>
         </div>
@@ -382,51 +396,45 @@ function showUserModal(editId?: number): void {
     if (e.target === modal) modal.remove();
   });
 
-  modal.querySelector('#saveUserBtn')?.addEventListener('click', () => {
+  modal.querySelector('#saveUserBtn')?.addEventListener('click', async () => {
     const name = (modal.querySelector('#userName') as HTMLInputElement).value;
     const email = (modal.querySelector('#userEmail') as HTMLInputElement).value;
     const phone = (modal.querySelector('#userPhone') as HTMLInputElement).value;
-    const role = (modal.querySelector('#userRole') as HTMLSelectElement).value;
-    const status = (modal.querySelector('#userStatus') as HTMLSelectElement).value;
+    const roleId = parseInt((modal.querySelector('#userRole') as HTMLSelectElement).value);
 
-    if (!name || !email || !phone || !role) {
+    if (!name || !email || !roleId) {
       alert('Please fill required fields');
       return;
     }
 
-    if (!isEdit) {
-      const password = (modal.querySelector('#userPassword') as HTMLInputElement).value;
-      const confirmPassword = (modal.querySelector('#userConfirmPassword') as HTMLInputElement).value;
-      if (!password || password !== confirmPassword) {
-        alert('Passwords do not match!');
-        return;
+    try {
+      if (isEdit && user) {
+        await authService.updateUser(user.id, {
+          email,
+          full_name: name,
+          phone: phone || undefined,
+          role_id: roleId,
+        });
+      } else {
+        const username = (modal.querySelector('#userUsername') as HTMLInputElement)?.value;
+        const password = (modal.querySelector('#userPassword') as HTMLInputElement)?.value;
+        if (!username || !password) {
+          alert('Username and password are required');
+          return;
+        }
+        await authService.createUser({
+          username,
+          email,
+          password,
+          full_name: name,
+          phone: phone || undefined,
+          role_id: roleId,
+        });
       }
+      await loadUsers();
+      modal.remove();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to save user');
     }
-
-    if (isEdit && user) {
-      user.name = name;
-      user.email = email;
-      user.phone = phone;
-      user.role = role;
-      user.status = status;
-      alert('User updated successfully!');
-    } else {
-      const initials = name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-      users.push({
-        id: users.length + 1,
-        name,
-        email,
-        phone,
-        role,
-        status,
-        last_login: 'Never',
-        created_at: new Date().toISOString().split('T')[0],
-        avatar: initials,
-      });
-      alert('User added successfully!');
-    }
-
-    renderTable();
-    modal.remove();
   });
 }

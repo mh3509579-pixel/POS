@@ -24,6 +24,18 @@ let currentPage = 'dashboard';
 let isLoggedIn = false;
 let currentCleanup: (() => void) | null = null;
 
+const rolePages: Record<string, string[]> = {
+  admin: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports', 'users', 'audit', 'backup', 'settings'],
+  stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
+  cashier: ['dashboard', 'pos', 'customers'],
+};
+
+function canAccessPage(page: string): boolean {
+  const user = authService.getUser();
+  const role = user?.role_name || 'admin';
+  return rolePages[role]?.includes(page) ?? false;
+}
+
 async function initLogin(): Promise<void> {
   const form = document.getElementById('loginForm') as HTMLFormElement;
   const toggleBtn = document.getElementById('togglePassword');
@@ -107,7 +119,11 @@ function showLogin(): void {
 }
 
 function loadPage(page: string): void {
-  // Cleanup previous page
+  if (!canAccessPage(page)) {
+    navigateTo('dashboard');
+    return;
+  }
+
   if (currentCleanup) {
     currentCleanup();
     currentCleanup = null;

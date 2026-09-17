@@ -1,7 +1,64 @@
 import { authService } from '../services/auth.service';
 
+function hasPermission(page: string, role: string): boolean {
+  const rolePermissions: Record<string, string[]> = {
+    admin: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports', 'users', 'audit', 'backup', 'settings'],
+    stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
+    cashier: ['dashboard', 'pos', 'customers'],
+  };
+  return rolePermissions[role]?.includes(page) ?? false;
+}
+
 export function renderAppShell(): string {
   const user = authService.getUser();
+  const role = user?.role_name || 'admin';
+
+  const navItems = [
+    { section: 'Main', items: [
+      { page: 'dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
+      { page: 'pos', icon: 'bi-cart3', label: 'POS' },
+    ]},
+    { section: 'Inventory', items: [
+      { page: 'medicines', icon: 'bi-capsule', label: 'Medicines' },
+      { page: 'inventory', icon: 'bi-box-seam', label: 'Inventory' },
+    ]},
+    { section: 'Transactions', items: [
+      { page: 'purchases', icon: 'bi-bag-plus', label: 'Purchases' },
+      { page: 'sales', icon: 'bi-receipt', label: 'Sales' },
+    ]},
+    { section: 'People', items: [
+      { page: 'customers', icon: 'bi-people', label: 'Customers' },
+      { page: 'suppliers', icon: 'bi-truck', label: 'Suppliers' },
+    ]},
+    { section: 'Finance', items: [
+      { page: 'expenses', icon: 'bi-wallet2', label: 'Expenses' },
+      { page: 'chart-of-accounts', icon: 'bi-journal-bookmark', label: 'Chart of Accounts' },
+      { page: 'journal-entries', icon: 'bi-journal-text', label: 'Journal Entries' },
+      { page: 'trial-balance', icon: 'bi-calculator', label: 'Trial Balance' },
+      { page: 'reports', icon: 'bi-bar-chart-line', label: 'Reports' },
+    ]},
+    { section: 'Administration', items: [
+      { page: 'users', icon: 'bi-person-gear', label: 'Users' },
+      { page: 'audit', icon: 'bi-journal-text', label: 'Audit Log' },
+      { page: 'backup', icon: 'bi-cloud-upload', label: 'Backup' },
+      { page: 'settings', icon: 'bi-gear', label: 'Settings' },
+    ]},
+  ];
+
+  let sidebarNav = '';
+  for (const group of navItems) {
+    const visibleItems = group.items.filter((item) => hasPermission(item.page, role));
+    if (visibleItems.length === 0) continue;
+    sidebarNav += `<div class="nav-section">${group.section}</div>`;
+    for (const item of visibleItems) {
+      const activeClass = item.page === 'dashboard' ? ' active' : '';
+      sidebarNav += `
+        <a class="nav-item${activeClass}" data-page="${item.page}" href="#${item.page}">
+          <i class="bi ${item.icon}"></i>
+          <span>${item.label}</span>
+        </a>`;
+    }
+  }
 
   return `
     <div class="app-shell">
@@ -16,85 +73,7 @@ export function renderAppShell(): string {
           </div>
         </div>
         <nav class="sidebar-nav">
-          <div class="nav-section">Main</div>
-          <a class="nav-item active" data-page="dashboard" href="#dashboard">
-            <i class="bi bi-speedometer2"></i>
-            <span>Dashboard</span>
-          </a>
-          <a class="nav-item" data-page="pos" href="#pos">
-            <i class="bi bi-cart3"></i>
-            <span>POS</span>
-          </a>
-
-          <div class="nav-section">Inventory</div>
-          <a class="nav-item" data-page="medicines" href="#medicines">
-            <i class="bi bi-capsule"></i>
-            <span>Medicines</span>
-          </a>
-          <a class="nav-item" data-page="inventory" href="#inventory">
-            <i class="bi bi-box-seam"></i>
-            <span>Inventory</span>
-          </a>
-
-          <div class="nav-section">Transactions</div>
-          <a class="nav-item" data-page="purchases" href="#purchases">
-            <i class="bi bi-bag-plus"></i>
-            <span>Purchases</span>
-          </a>
-          <a class="nav-item" data-page="sales" href="#sales">
-            <i class="bi bi-receipt"></i>
-            <span>Sales</span>
-          </a>
-
-          <div class="nav-section">People</div>
-          <a class="nav-item" data-page="customers" href="#customers">
-            <i class="bi bi-people"></i>
-            <span>Customers</span>
-          </a>
-          <a class="nav-item" data-page="suppliers" href="#suppliers">
-            <i class="bi bi-truck"></i>
-            <span>Suppliers</span>
-          </a>
-
-          <div class="nav-section">Finance</div>
-          <a class="nav-item" data-page="expenses" href="#expenses">
-            <i class="bi bi-wallet2"></i>
-            <span>Expenses</span>
-          </a>
-          <a class="nav-item" data-page="chart-of-accounts" href="#chart-of-accounts">
-            <i class="bi bi-journal-bookmark"></i>
-            <span>Chart of Accounts</span>
-          </a>
-          <a class="nav-item" data-page="journal-entries" href="#journal-entries">
-            <i class="bi bi-journal-text"></i>
-            <span>Journal Entries</span>
-          </a>
-          <a class="nav-item" data-page="trial-balance" href="#trial-balance">
-            <i class="bi bi-calculator"></i>
-            <span>Trial Balance</span>
-          </a>
-          <a class="nav-item" data-page="reports" href="#reports">
-            <i class="bi bi-bar-chart-line"></i>
-            <span>Reports</span>
-          </a>
-
-          <div class="nav-section">Administration</div>
-          <a class="nav-item" data-page="users" href="#users">
-            <i class="bi bi-person-gear"></i>
-            <span>Users</span>
-          </a>
-          <a class="nav-item" data-page="audit" href="#audit">
-            <i class="bi bi-journal-text"></i>
-            <span>Audit Log</span>
-          </a>
-          <a class="nav-item" data-page="backup" href="#backup">
-            <i class="bi bi-cloud-upload"></i>
-            <span>Backup</span>
-          </a>
-          <a class="nav-item" data-page="settings" href="#settings">
-            <i class="bi bi-gear"></i>
-            <span>Settings</span>
-          </a>
+          ${sidebarNav}
         </nav>
         <div class="sidebar-footer">
           <div class="user-info">
@@ -137,7 +116,6 @@ export function renderAppShell(): string {
           </div>
         </header>
         <div class="page-content" id="pageContent">
-          <!-- Dynamic content loaded here -->
         </div>
       </main>
     </div>
