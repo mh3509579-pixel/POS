@@ -10,8 +10,11 @@ import {
   getAllCategories,
   createCategory,
 } from './expense.controller.js';
+import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 // Expense routes
 router.post('/expenses', createExpense);

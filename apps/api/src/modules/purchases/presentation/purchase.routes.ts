@@ -7,8 +7,11 @@ import {
   getDailyPurchases,
   getPurchasesSummary,
 } from './purchase.controller.js';
+import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.post('/purchases', createPurchase);
 router.get('/purchases', getAllPurchases);

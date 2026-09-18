@@ -132,6 +132,11 @@ class MedicineStore {
   }
 
   async updateStock(id: number, quantityChange: number): Promise<Medicine | undefined> {
+    try {
+      await api.post(`/medicines/${id}/stock-update`, { quantity_change: quantityChange });
+    } catch {
+      // Fallback to local update if API unavailable
+    }
     const medicine = this.medicines.find((m) => m.id === id);
     if (!medicine) return undefined;
     medicine.stock = Math.max(0, medicine.stock + quantityChange);

@@ -7,8 +7,11 @@ import {
   getDailySales,
   getSalesSummary,
 } from './sale.controller.js';
+import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.post('/sales', createSale);
 router.get('/sales', getAllSales);

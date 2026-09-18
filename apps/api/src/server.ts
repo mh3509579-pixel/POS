@@ -1,6 +1,9 @@
 import 'dotenv/config';
 
 import app from './presentation/app.js';
+import { clearRateLimitStore } from './infrastructure/middleware/rate-limit.middleware.js';
+
+clearRateLimitStore();
 
 const PORT = process.env.PORT || 3001;
 

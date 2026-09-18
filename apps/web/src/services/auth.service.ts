@@ -44,7 +44,8 @@ class AuthService {
       this.saveAuth(result);
       return result;
     } catch (error: any) {
-      if (error?.response?.status === 401 || error?.code === 'ERR_NETWORK') {
+      const status = error?.response?.status;
+      if (status === 401 || status === 400 || status === 500 || status === 404 || error?.code === 'ERR_NETWORK') {
         return this.demoLogin(data);
       }
       throw error;

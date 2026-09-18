@@ -13,8 +13,11 @@ import {
   getAccountStatement,
   getAccountBalance,
 } from './accounting.controller.js';
+import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 // Account routes
 router.get('/accounts', getAllAccounts);

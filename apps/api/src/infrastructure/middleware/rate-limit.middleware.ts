@@ -9,6 +9,10 @@ interface RateLimitStore {
 
 const store: RateLimitStore = {};
 
+export function clearRateLimitStore(): void {
+  Object.keys(store).forEach((key) => delete store[key]);
+}
+
 export interface RateLimitOptions {
   windowMs?: number;
   max?: number;
@@ -23,6 +27,11 @@ export function createRateLimit(options: RateLimitOptions = {}) {
   } = options;
 
   return (req: Request, res: Response, next: NextFunction): void => {
+    if (process.env.NODE_ENV === 'development') {
+      next();
+      return;
+    }
+
     const key = req.ip || req.connection.remoteAddress || 'unknown';
     const now = Date.now();
 
@@ -51,12 +60,12 @@ export function createRateLimit(options: RateLimitOptions = {}) {
 
 export const apiRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   message: 'Too many API requests, please try again later.',
 });
 
 export const authRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   message: 'Too many login attempts, please try again later.',
 });

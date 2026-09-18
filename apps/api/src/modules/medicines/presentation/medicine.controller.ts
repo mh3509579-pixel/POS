@@ -186,3 +186,33 @@ export async function searchForPOS(req: Request, res: Response, next: NextFuncti
     next(error);
   }
 }
+
+export async function updateStock(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const medicineId = parseInt(req.params.id);
+    const { quantity_change } = req.body;
+
+    if (quantity_change === undefined || !Number.isInteger(quantity_change)) {
+      res.status(400).json({ status: 'error', message: 'quantity_change must be an integer' });
+      return;
+    }
+
+    const medicine = await medicineRepo.findById(medicineId);
+    if (!medicine) {
+      res.status(404).json({ status: 'error', message: 'Medicine not found' });
+      return;
+    }
+
+    const newStock = (medicine.total_stock || 0) + quantity_change;
+    if (newStock < 0) {
+      res.status(400).json({ status: 'error', message: 'Insufficient stock' });
+      return;
+    }
+
+    await medicineRepo.updateStock(medicineId, quantity_change);
+    const updated = await medicineRepo.findById(medicineId);
+    res.json({ status: 'success', data: updated });
+  } catch (error) {
+    next(error);
+  }
+}

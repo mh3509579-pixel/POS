@@ -25,9 +25,13 @@ let isLoggedIn = false;
 let currentCleanup: (() => void) | null = null;
 
 const rolePages: Record<string, string[]> = {
+  SUPER_ADMIN: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports', 'users', 'audit', 'backup', 'settings'],
   admin: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports', 'users', 'audit', 'backup', 'settings'],
+  pharmacist: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'reports'],
+  cashier: ['dashboard', 'pos', 'customers', 'sales'],
+  inventory_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
   stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
-  cashier: ['dashboard', 'pos', 'customers'],
+  accountant: ['dashboard', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports'],
 };
 
 function canAccessPage(page: string): boolean {
@@ -70,7 +74,13 @@ async function initLogin(): Promise<void> {
       navigateTo('dashboard');
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Login failed. Please check your credentials.';
-      alert(message);
+      const errorDiv = document.getElementById('loginError');
+      if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+      } else {
+        alert(message);
+      }
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Sign In';
     }

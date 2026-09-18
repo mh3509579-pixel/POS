@@ -178,6 +178,17 @@ export class MedicineRepository {
     return result.affectedRows > 0;
   }
 
+  async updateStock(medicineId: number, quantityChange: number): Promise<boolean> {
+    const batches = await this.findBatchesByMedicine(medicineId);
+    if (batches.length === 0) return false;
+
+    if (quantityChange < 0) {
+      return this.reduceBatchStock(batches[0].id, Math.abs(quantityChange));
+    } else {
+      return this.increaseBatchStock(batches[0].id, quantityChange);
+    }
+  }
+
   async getExpiringBatches(days: number = 90): Promise<(MedicineBatch & { medicine_name: string })[]> {
     return query<(MedicineBatch & { medicine_name: string })[]>(
       `SELECT mb.*, m.name as medicine_name

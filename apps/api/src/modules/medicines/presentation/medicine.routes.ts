@@ -15,6 +15,7 @@ import {
   getAllManufacturers,
   getAllUnits,
   searchForPOS,
+  updateStock,
 } from './medicine.controller.js';
 import { authenticate, authorize } from '../../../infrastructure/middleware/auth.middleware.js';
 
@@ -32,6 +33,9 @@ router.get('/:id', authenticate, authorize('medicines.view'), getMedicineById);
 router.post('/', authenticate, authorize('medicines.create'), createMedicine);
 router.put('/:id', authenticate, authorize('medicines.update'), updateMedicine);
 router.delete('/:id', authenticate, authorize('medicines.delete'), deleteMedicine);
+
+// Stock update
+router.post('/:id/stock-update', authenticate, updateStock);
 
 // Batch management
 router.get('/:id/batches', authenticate, authorize('medicines.view'), getMedicineBatches);

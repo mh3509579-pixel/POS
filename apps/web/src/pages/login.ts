@@ -25,6 +25,12 @@ export function renderLoginPage(): string {
             <span>Secure</span>
           </div>
         </div>
+        <div class="demo-credentials">
+          <p><strong>Demo Credentials:</strong></p>
+          <small>Admin: admin / admin123</small><br>
+          <small>Cashier: cashier / cashier123</small><br>
+          <small>Stock: stockmanager / stock123</small>
+        </div>
       </div>
       <div class="login-right">
         <div class="login-form">
@@ -36,6 +42,7 @@ export function renderLoginPage(): string {
             <p>Sign in to your account</p>
           </div>
           <form id="loginForm">
+            <div id="loginError" class="login-error" style="display:none;"></div>
             <div class="form-floating mb-3">
               <input
                 type="text"

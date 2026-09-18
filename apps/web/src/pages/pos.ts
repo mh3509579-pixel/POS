@@ -145,6 +145,10 @@ export function initPOS(): () => void {
   let customer = { name: 'Walk-in Customer', phone: '' };
   let paymentMethod = 'cash';
 
+  medicineStore.loadMedicines().then(() => {
+    renderProducts();
+  }).catch(() => {});
+
   function getCategoryIcon(category: string): string {
     const icons: Record<string, string> = {
       tablets: 'bi-tablet',

@@ -145,6 +145,31 @@ body {
   color: var(--bg-white);
 }
 
+.login-left .demo-credentials {
+  margin-top: 2rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: left;
+  position: relative;
+  z-index: 1;
+}
+
+.login-left .demo-credentials p {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  color: var(--bg-white);
+  opacity: 0.9;
+}
+
+.login-left .demo-credentials small {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  color: var(--bg-white);
+  line-height: 1.6;
+}
+
 .login-right {
   width: 480px;
   background: var(--bg-white);
@@ -157,6 +182,17 @@ body {
 .login-form {
   width: 100%;
   max-width: 360px;
+}
+
+.login-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  text-align: center;
 }
 
 .login-form .form-header {

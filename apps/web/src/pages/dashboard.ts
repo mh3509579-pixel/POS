@@ -747,6 +747,8 @@ export async function renderDashboard(): Promise<string> {
 }
 
 export function initDashboard(): void {
+  medicineStore.loadMedicines().catch(() => {});
+
   document.querySelectorAll('.view-all-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const page = btn.getAttribute('data-page');
