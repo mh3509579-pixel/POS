@@ -5,7 +5,7 @@ const expenseService = new ExpenseService();
 
 export async function createExpense(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = (req as any).user?.id || 1; // Default to 1 for now
+    const userId = (req as any).user?.userId || 1;
     const expense = await expenseService.createExpense(req.body, userId);
     res.status(201).json({ status: 'success', data: expense });
   } catch (error) {

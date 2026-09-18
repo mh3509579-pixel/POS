@@ -7,10 +7,10 @@ export interface Expense {
   amount: number;
   description: string;
   expense_date: string;
-  payment_method: 'cash' | 'card' | 'bank_transfer' | 'online';
-  receipt_number: string | null;
+  payment_method: 'cash' | 'card' | 'bank_transfer';
+  reference_number: string | null;
   notes: string | null;
-  created_by: number;
+  user_id: number;
   created_at: string;
   category_name?: string;
 }
@@ -27,7 +27,7 @@ export interface CreateExpenseDTO {
   amount: number;
   description: string;
   expense_date: string;
-  payment_method: 'cash' | 'card' | 'bank_transfer' | 'online';
+  payment_method: 'cash' | 'card' | 'bank_transfer';
   receipt_number?: string;
   notes?: string;
 }

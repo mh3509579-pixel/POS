@@ -11,10 +11,9 @@ export interface Expense {
   description: string;
   expense_date: Date;
   payment_method: 'cash' | 'card' | 'bank_transfer';
-  receipt_number: string | null;
+  reference_number: string | null;
+  receipt_path: string | null;
   status: ExpenseStatus;
-  approved_by: number | null;
-  approved_at: Date | null;
   notes: string | null;
   created_at: Date;
   updated_at: Date;
@@ -24,9 +23,10 @@ export interface ExpenseCategory {
   id: number;
   name: string;
   description: string | null;
-  account_id: number | null;
+  budget_limit: number | null;
   is_active: boolean;
   created_at: Date;
+  updated_at: Date;
 }
 
 export interface CreateExpenseDTO {
@@ -42,7 +42,6 @@ export interface CreateExpenseDTO {
 export interface CreateExpenseCategoryDTO {
   name: string;
   description?: string;
-  account_id?: number;
 }
 
 export interface ExpenseWithCategory extends Expense {

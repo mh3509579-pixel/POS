@@ -7,13 +7,15 @@ export interface Purchase {
   purchase_number: string;
   supplier_id: number;
   user_id: number;
-  invoice_number: string | null;
+  invoice_ref: string | null;
   subtotal: number;
-  discount: number;
-  tax: number;
-  total: number;
+  discount_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  payment_method: string;
+  payment_status: string;
   status: PurchaseStatus;
-  received_date: Date | null;
   notes: string | null;
   created_at: Date;
   updated_at: Date;
@@ -23,14 +25,15 @@ export interface PurchaseItem {
   id: number;
   purchase_id: number;
   medicine_id: number;
+  batch_id: number | null;
   batch_number: string;
   expiry_date: Date;
   quantity: number;
-  unit_price: number;
+  purchase_price: number;
   sale_price: number;
-  discount: number;
   total: number;
   created_at: Date;
+  medicine_name?: string;
 }
 
 export interface CreatePurchaseDTO {
@@ -45,11 +48,10 @@ export interface CreatePurchaseDTO {
 export interface CreatePurchaseItemDTO {
   medicine_id: number;
   batch_number: string;
-  expiry_date: Date;
+  expiry_date: string;
   quantity: number;
   unit_price: number;
   sale_price: number;
-  discount?: number;
 }
 
 export interface PurchaseWithItems extends Purchase {

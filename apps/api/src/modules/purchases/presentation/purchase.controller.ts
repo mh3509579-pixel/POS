@@ -5,7 +5,7 @@ const purchaseService = new PurchaseService();
 
 export async function createPurchase(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = (req as any).user?.id || 1; // Default to 1 for now
+    const userId = (req as any).user?.userId || 1;
     const purchase = await purchaseService.createPurchase(req.body, userId);
     res.status(201).json({ status: 'success', data: purchase });
   } catch (error) {

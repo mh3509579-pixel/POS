@@ -24,11 +24,18 @@ const router = Router();
 // POS search (no auth needed for quick lookup)
 router.get('/pos/search', searchForPOS);
 
-// Medicine CRUD
-router.get('/', authenticate, authorize('medicines.view'), getAllMedicines);
+// Static routes BEFORE /:id to avoid shadowing
 router.get('/low-stock', authenticate, authorize('medicines.view'), getLowStockMedicines);
 router.get('/expiring', authenticate, authorize('medicines.view'), getExpiringBatches);
 router.get('/barcode/:barcode', authenticate, authorize('medicines.view'), getMedicineByBarcode);
+
+// Lookup tables BEFORE /:id
+router.get('/lookups/categories', authenticate, getAllCategories);
+router.get('/lookups/manufacturers', authenticate, getAllManufacturers);
+router.get('/lookups/units', authenticate, getAllUnits);
+
+// Medicine CRUD
+router.get('/', authenticate, authorize('medicines.view'), getAllMedicines);
 router.get('/:id', authenticate, authorize('medicines.view'), getMedicineById);
 router.post('/', authenticate, authorize('medicines.create'), createMedicine);
 router.put('/:id', authenticate, authorize('medicines.update'), updateMedicine);
@@ -41,10 +48,5 @@ router.post('/:id/stock-update', authenticate, updateStock);
 router.get('/:id/batches', authenticate, authorize('medicines.view'), getMedicineBatches);
 router.post('/:id/batches', authenticate, authorize('inventory.batch.manage'), createBatch);
 router.put('/batches/:batchId', authenticate, authorize('inventory.batch.manage'), updateBatch);
-
-// Lookup tables
-router.get('/lookups/categories', authenticate, getAllCategories);
-router.get('/lookups/manufacturers', authenticate, getAllManufacturers);
-router.get('/lookups/units', authenticate, getAllUnits);
 
 export { router as medicinesRoutes };

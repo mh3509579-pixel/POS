@@ -50,7 +50,7 @@ router.put('/purchases/:id/receive', async (req: Request, res: Response) => {
       } else {
         const [newBatch] = await pool.query(
           'INSERT INTO medicine_batches (medicine_id, batch_number, expiry_date, purchase_price, sale_price, quantity, supplier_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [item.medicine_id, item.batch_number || `PO-${id}`, item.expiry_date || '2027-12-31', item.unit_price, item.unit_price * 1.3, item.quantity, purchase[0].supplier_id]
+          [item.medicine_id, item.batch_number || `PO-${id}`, item.expiry_date || '2027-12-31', item.purchase_price, item.sale_price, item.quantity, purchase[0].supplier_id]
         ) as any[];
         batchId = newBatch.insertId;
       }

@@ -120,16 +120,16 @@ async function fetchDashboardData(): Promise<DashboardData> {
       },
       customers: {
         total: customersData.total || customersData.data?.length || 0,
-        pendingReceivable: customersData.data?.filter((c: any) => c.balance > 0).reduce((sum: number, c: any) => sum + c.balance, 0) || 0,
+        pendingReceivable: customersData.data?.filter((c: any) => (c.current_balance || 0) > 0).reduce((sum: number, c: any) => sum + (c.current_balance || 0), 0) || 0,
         topCustomers: (customersData.data || [])
-          .filter((c: any) => c.balance > 0)
-          .sort((a: any, b: any) => b.balance - a.balance)
+          .filter((c: any) => (c.current_balance || 0) > 0)
+          .sort((a: any, b: any) => (b.current_balance || 0) - (a.current_balance || 0))
           .slice(0, 4)
-          .map((c: any) => ({ name: c.name, type: c.customer_type || 'regular', balance: c.balance || 0 })),
+          .map((c: any) => ({ name: c.name, type: c.type || 'regular', balance: c.current_balance || 0 })),
       },
       suppliers: {
         total: suppliersData.total || suppliersData.data?.length || 0,
-        pendingPayable: suppliersData.data?.filter((s: any) => s.balance > 0).reduce((sum: number, s: any) => sum + s.balance, 0) || 0,
+        pendingPayable: suppliersData.data?.filter((s: any) => (s.current_balance || 0) > 0).reduce((sum: number, s: any) => sum + (s.current_balance || 0), 0) || 0,
       },
       expenses: {
         today: todayExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0),

@@ -5,7 +5,7 @@ import { query, queryOne, execute } from '../../../infrastructure/database/conne
 export class GeneralLedgerRepository implements IGeneralLedgerRepository {
   async findByAccountId(accountId: number, startDate?: Date, endDate?: Date): Promise<LedgerEntryWithDetails[]> {
     let sql = `
-      SELECT gl.*, a.name as account_name, a.code as account_code, je.entry_number
+      SELECT gl.*, a.name as account_name, a.code as account_code, a.type as account_type, je.entry_number
       FROM general_ledger gl
       INNER JOIN accounts a ON gl.account_id = a.id
       INNER JOIN journal_entries je ON gl.journal_entry_id = je.id

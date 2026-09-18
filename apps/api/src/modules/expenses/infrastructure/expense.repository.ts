@@ -3,58 +3,55 @@ import { query, queryOne, execute, beginTransaction, commitTransaction, rollback
 
 export class ExpenseRepository {
   async findById(id: number): Promise<ExpenseWithCategory | null> {
-    const expense = await queryOne<Expense>('SELECT * FROM expenses WHERE id = ?', [id]);
-    if (!expense) return null;
-
-    const category = await queryOne<ExpenseCategory>('SELECT name FROM expense_categories WHERE id = ?', [expense.category_id]);
-    return { ...expense, category_name: category?.name };
+    const expense = await queryOne<any>(
+      `SELECT e.*, ec.name as category_name
+       FROM expenses e
+       LEFT JOIN expense_categories ec ON e.category_id = ec.id
+       WHERE e.id = ?`,
+      [id]
+    );
+    return expense || null;
   }
 
   async findByExpenseNumber(expenseNumber: string): Promise<ExpenseWithCategory | null> {
-    const expense = await queryOne<Expense>('SELECT * FROM expenses WHERE expense_number = ?', [expenseNumber]);
-    if (!expense) return null;
-
-    const category = await queryOne<ExpenseCategory>('SELECT name FROM expense_categories WHERE id = ?', [expense.category_id]);
-    return { ...expense, category_name: category?.name };
+    const expense = await queryOne<any>(
+      `SELECT e.*, ec.name as category_name
+       FROM expenses e
+       LEFT JOIN expense_categories ec ON e.category_id = ec.id
+       WHERE e.expense_number = ?`,
+      [expenseNumber]
+    );
+    return expense || null;
   }
 
   async findAll(limit: number = 50, offset: number = 0): Promise<ExpenseWithCategory[]> {
-    const expenses = await query<Expense[]>('SELECT * FROM expenses ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
-    const expensesWithCategory: ExpenseWithCategory[] = [];
-
-    for (const expense of expenses) {
-      const category = await queryOne<ExpenseCategory>('SELECT name FROM expense_categories WHERE id = ?', [expense.category_id]);
-      expensesWithCategory.push({ ...expense, category_name: category?.name });
-    }
-
-    return expensesWithCategory;
+    return query<any[]>(
+      `SELECT e.*, ec.name as category_name
+       FROM expenses e
+       LEFT JOIN expense_categories ec ON e.category_id = ec.id
+       ORDER BY e.created_at DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
   }
 
   async findByDateRange(startDate: Date, endDate: Date): Promise<ExpenseWithCategory[]> {
-    const expenses = await query<Expense[]>(
-      'SELECT * FROM expenses WHERE expense_date BETWEEN ? AND ? ORDER BY expense_date DESC',
+    return query<any[]>(
+      `SELECT e.*, ec.name as category_name
+       FROM expenses e
+       LEFT JOIN expense_categories ec ON e.category_id = ec.id
+       WHERE e.expense_date BETWEEN ? AND ? ORDER BY e.expense_date DESC`,
       [startDate, endDate]
     );
-
-    const expensesWithCategory: ExpenseWithCategory[] = [];
-    for (const expense of expenses) {
-      const category = await queryOne<ExpenseCategory>('SELECT name FROM expense_categories WHERE id = ?', [expense.category_id]);
-      expensesWithCategory.push({ ...expense, category_name: category?.name });
-    }
-
-    return expensesWithCategory;
   }
 
   async findByCategory(categoryId: number): Promise<ExpenseWithCategory[]> {
-    const expenses = await query<Expense[]>('SELECT * FROM expenses WHERE category_id = ? ORDER BY created_at DESC', [categoryId]);
-    const expensesWithCategory: ExpenseWithCategory[] = [];
-
-    for (const expense of expenses) {
-      const category = await queryOne<ExpenseCategory>('SELECT name FROM expense_categories WHERE id = ?', [expense.category_id]);
-      expensesWithCategory.push({ ...expense, category_name: category?.name });
-    }
-
-    return expensesWithCategory;
+    return query<any[]>(
+      `SELECT e.*, ec.name as category_name
+       FROM expenses e
+       LEFT JOIN expense_categories ec ON e.category_id = ec.id
+       WHERE e.category_id = ? ORDER BY e.created_at DESC`,
+      [categoryId]
+    );
   }
 
   async count(): Promise<number> {
@@ -66,7 +63,7 @@ export class ExpenseRepository {
     const expenseNumber = await this.getNextExpenseNumber();
 
     const result = await execute(
-      `INSERT INTO expenses (expense_number, category_id, user_id, amount, description, expense_date, payment_method, receipt_number, status, notes)
+      `INSERT INTO expenses (expense_number, category_id, user_id, amount, description, expense_date, payment_method, reference_number, status, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?)`,
       [
         expenseNumber,
@@ -84,15 +81,8 @@ export class ExpenseRepository {
     return this.findById(result.insertId) as Promise<ExpenseWithCategory>;
   }
 
-  async updateStatus(id: number, status: string, approvedBy?: number): Promise<Expense | null> {
-    if (status === 'approved') {
-      await execute(
-        'UPDATE expenses SET status = ?, approved_by = ?, approved_at = ? WHERE id = ?',
-        [status, approvedBy || null, new Date(), id]
-      );
-    } else {
-      await execute('UPDATE expenses SET status = ? WHERE id = ?', [status, id]);
-    }
+  async updateStatus(id: number, status: string): Promise<Expense | null> {
+    await execute('UPDATE expenses SET status = ?, updated_at = NOW() WHERE id = ?', [status, id]);
     return queryOne<Expense>('SELECT * FROM expenses WHERE id = ?', [id]);
   }
 
@@ -158,15 +148,14 @@ export class ExpenseRepository {
     };
   }
 
-  // Category methods
   async getAllCategories(): Promise<ExpenseCategory[]> {
     return query<ExpenseCategory[]>('SELECT * FROM expense_categories ORDER BY name');
   }
 
   async createCategory(data: CreateExpenseCategoryDTO): Promise<ExpenseCategory> {
     const result = await execute(
-      'INSERT INTO expense_categories (name, description, account_id) VALUES (?, ?, ?)',
-      [data.name, data.description || null, data.account_id || null]
+      'INSERT INTO expense_categories (name, description) VALUES (?, ?)',
+      [data.name, data.description || null]
     );
     const category = await queryOne<ExpenseCategory>('SELECT * FROM expense_categories WHERE id = ?', [result.insertId]);
     if (!category) {

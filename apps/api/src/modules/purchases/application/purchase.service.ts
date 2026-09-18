@@ -24,7 +24,7 @@ export class PurchaseService {
     // Record in accounting
     await this.accountingService.recordPurchase(
       purchase.id,
-      purchase.total,
+      purchase.total_amount,
       purchase.supplier_id,
       []
     );

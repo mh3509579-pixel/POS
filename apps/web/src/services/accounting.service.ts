@@ -1,113 +1,88 @@
-const API_BASE = '/api';
-
-async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || 'Request failed');
-  }
-
-  return response.json();
-}
+import api from './api.service';
 
 export const accountingService = {
-  // Accounts
   async getAllAccounts() {
-    return apiRequest<{ status: string; data: any[] }>('/accounting/accounts');
+    const response = await api.get<{ status: string; data: any[] }>('/accounting/accounts');
+    return response.data;
   },
 
   async getAccount(id: number) {
-    return apiRequest<{ status: string; data: any }>(`/accounting/accounts/${id}`);
+    const response = await api.get<{ status: string; data: any }>(`/accounting/accounts/${id}`);
+    return response.data;
   },
 
   async createAccount(data: any) {
-    return apiRequest<{ status: string; data: any }>('/accounting/accounts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const response = await api.post<{ status: string; data: any }>('/accounting/accounts', data);
+    return response.data;
   },
 
   async updateAccount(id: number, data: any) {
-    return apiRequest<{ status: string; data: any }>(`/accounting/accounts/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    const response = await api.put<{ status: string; data: any }>(`/accounting/accounts/${id}`, data);
+    return response.data;
   },
 
-  // Journal Entries
   async getAllJournalEntries(params?: { start_date?: string; end_date?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.start_date) searchParams.append('start_date', params.start_date);
     if (params?.end_date) searchParams.append('end_date', params.end_date);
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any[] }>(`/accounting/journal-entries${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any[] }>(`/accounting/journal-entries${query ? `?${query}` : ''}`);
+    return response.data;
   },
 
   async getJournalEntry(id: number) {
-    return apiRequest<{ status: string; data: any }>(`/accounting/journal-entries/${id}`);
+    const response = await api.get<{ status: string; data: any }>(`/accounting/journal-entries/${id}`);
+    return response.data;
   },
 
   async createJournalEntry(data: any) {
-    return apiRequest<{ status: string; data: any }>('/accounting/journal-entries', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const response = await api.post<{ status: string; data: any }>('/accounting/journal-entries', data);
+    return response.data;
   },
 
   async postJournalEntry(id: number) {
-    return apiRequest<{ status: string; data: any }>(`/accounting/journal-entries/${id}/post`, {
-      method: 'POST',
-    });
+    const response = await api.post<{ status: string; data: any }>(`/accounting/journal-entries/${id}/post`);
+    return response.data;
   },
 
   async voidJournalEntry(id: number, reason: string) {
-    return apiRequest<{ status: string; data: any }>(`/accounting/journal-entries/${id}/void`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
+    const response = await api.post<{ status: string; data: any }>(`/accounting/journal-entries/${id}/void`, { reason });
+    return response.data;
   },
 
-  // Trial Balance
   async getTrialBalance(params?: { start_date?: string; end_date?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.start_date) searchParams.append('start_date', params.start_date);
     if (params?.end_date) searchParams.append('end_date', params.end_date);
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any[] }>(`/accounting/trial-balance${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any[] }>(`/accounting/trial-balance${query ? `?${query}` : ''}`);
+    return response.data;
   },
 
-  // Account Statement
   async getAccountStatement(accountId: number, params?: { start_date?: string; end_date?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.start_date) searchParams.append('start_date', params.start_date);
     if (params?.end_date) searchParams.append('end_date', params.end_date);
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any }>(`/accounting/accounts/${accountId}/statement${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any }>(`/accounting/accounts/${accountId}/statement${query ? `?${query}` : ''}`);
+    return response.data;
   },
 
-  // Account Balance
   async getAccountBalance(accountId: number) {
-    return apiRequest<{ status: string; data: { balance: number } }>(`/accounting/accounts/${accountId}/balance`);
+    const response = await api.get<{ status: string; data: { balance: number } }>(`/accounting/accounts/${accountId}/balance`);
+    return response.data;
   },
 };
 
 export const salesService = {
   async createSale(data: any) {
-    return apiRequest<{ status: string; data: any }>('/transactions/sales', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const response = await api.post<{ status: string; data: any }>('/transactions/sales', data);
+    return response.data;
   },
 
   async getSale(id: number) {
-    return apiRequest<{ status: string; data: any }>(`/transactions/sales/${id}`);
+    const response = await api.get<{ status: string; data: any }>(`/transactions/sales/${id}`);
+    return response.data;
   },
 
   async getAllSales(params?: { limit?: number; offset?: number }) {
@@ -115,27 +90,28 @@ export const salesService = {
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.offset) searchParams.append('offset', params.offset.toString());
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any[] }>(`/transactions/sales${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any[] }>(`/transactions/sales${query ? `?${query}` : ''}`);
+    return response.data;
   },
 
   async getDailySales(date?: string) {
     const searchParams = new URLSearchParams();
     if (date) searchParams.append('date', date);
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any }>(`/transactions/sales/daily${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any }>(`/transactions/sales/daily${query ? `?${query}` : ''}`);
+    return response.data;
   },
 };
 
 export const purchasesService = {
   async createPurchase(data: any) {
-    return apiRequest<{ status: string; data: any }>('/transactions/purchases', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const response = await api.post<{ status: string; data: any }>('/transactions/purchases', data);
+    return response.data;
   },
 
   async getPurchase(id: number) {
-    return apiRequest<{ status: string; data: any }>(`/transactions/purchases/${id}`);
+    const response = await api.get<{ status: string; data: any }>(`/transactions/purchases/${id}`);
+    return response.data;
   },
 
   async getAllPurchases(params?: { limit?: number; offset?: number }) {
@@ -143,20 +119,20 @@ export const purchasesService = {
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.offset) searchParams.append('offset', params.offset.toString());
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any[] }>(`/transactions/purchases${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any[] }>(`/transactions/purchases${query ? `?${query}` : ''}`);
+    return response.data;
   },
 };
 
 export const expensesService = {
   async createExpense(data: any) {
-    return apiRequest<{ status: string; data: any }>('/transactions/expenses', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const response = await api.post<{ status: string; data: any }>('/transactions/expenses', data);
+    return response.data;
   },
 
   async getExpense(id: number) {
-    return apiRequest<{ status: string; data: any }>(`/transactions/expenses/${id}`);
+    const response = await api.get<{ status: string; data: any }>(`/transactions/expenses/${id}`);
+    return response.data;
   },
 
   async getAllExpenses(params?: { limit?: number; offset?: number }) {
@@ -164,10 +140,12 @@ export const expensesService = {
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.offset) searchParams.append('offset', params.offset.toString());
     const query = searchParams.toString();
-    return apiRequest<{ status: string; data: any[] }>(`/transactions/expenses${query ? `?${query}` : ''}`);
+    const response = await api.get<{ status: string; data: any[] }>(`/transactions/expenses${query ? `?${query}` : ''}`);
+    return response.data;
   },
 
   async getAllCategories() {
-    return apiRequest<{ status: string; data: any[] }>('/transactions/expense-categories');
+    const response = await api.get<{ status: string; data: any[] }>('/transactions/expense-categories');
+    return response.data;
   },
 };
