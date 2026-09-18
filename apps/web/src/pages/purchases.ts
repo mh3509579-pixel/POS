@@ -1,6 +1,7 @@
 import { medicineStore } from '../stores/medicine.store';
 import { createLineChart, createDonutChart } from '../utils/charts';
 import { purchaseService, Purchase as ApiPurchase } from '../services/purchase.service';
+import { supplierService } from '../services/supplier.service';
 
 type PurchaseTab = 'list' | 'new' | 'returns';
 
@@ -73,8 +74,24 @@ export function renderPurchases(): string {
 }
 
 export function initPurchases(): void {
+  loadSuppliers();
   loadPurchases();
   initTabs();
+}
+
+async function loadSuppliers(): Promise<void> {
+  try {
+    const { data } = await supplierService.getAll({ limit: 100 });
+    suppliers = data.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      phone: s.phone || '',
+      address: s.address || '',
+      balance: s.balance || 0,
+    }));
+  } catch {
+    suppliers = [];
+  }
 }
 
 async function loadPurchases(): Promise<void> {
@@ -478,22 +495,30 @@ function viewPurchase(id: number): void {
   });
 }
 
-function receivePurchase(id: number): void {
+async function receivePurchase(id: number): Promise<void> {
   if (!confirm('Are you sure you want to mark this purchase as received?')) return;
   
-  const purchase = purchases.find((p) => p.id === id);
-  if (purchase) {
-    purchase.status = 'received';
-    
-    // Update stock for each item
-    purchase.items.forEach((item) => {
-      const med = medicineStore.getAll().find((m) => m.id === item.medicine_id);
-      if (med) {
+  try {
+    await purchaseService.receive(id);
+    const purchase = purchases.find((p) => p.id === id);
+    if (purchase) {
+      purchase.status = 'received';
+      purchase.items.forEach((item) => {
         medicineStore.updateStock(item.medicine_id, item.quantity);
-      }
-    });
-    
+      });
+    }
     alert('Purchase received successfully! Stock updated.');
+    loadTab('list');
+  } catch (error) {
+    console.warn('API receive failed, processing locally:', error);
+    const purchase = purchases.find((p) => p.id === id);
+    if (purchase) {
+      purchase.status = 'received';
+      purchase.items.forEach((item) => {
+        medicineStore.updateStock(item.medicine_id, item.quantity);
+      });
+    }
+    alert('Purchase received locally! Stock updated.');
     loadTab('list');
   }
 }
@@ -791,7 +816,7 @@ function updateSummary(): void {
   if (totalEl) totalEl.textContent = `₨ ${total.toLocaleString()}`;
 }
 
-function savePurchase(): void {
+async function savePurchase(): Promise<void> {
   if (!selectedSupplier) {
     alert('Please select a supplier');
     return;
@@ -816,6 +841,25 @@ function savePurchase(): void {
   if (amountPaid >= total) paymentStatus = 'paid';
   else if (amountPaid > 0) paymentStatus = 'partial';
 
+  try {
+    await purchaseService.create({
+      supplier_id: selectedSupplier.id,
+      items: cart.map((item) => ({
+        medicine_id: item.medicine_id,
+        batch_number: item.batch,
+        expiry_date: item.expiry,
+        quantity: item.quantity,
+        unit_price: item.purchase_price,
+        sale_price: item.sale_price,
+      })),
+      discount,
+      tax_rate: taxRate,
+    });
+    alert('Purchase created successfully!');
+  } catch (error) {
+    console.warn('API purchase creation failed, processing locally:', error);
+  }
+
   const newPurchase: Purchase = {
     id: purchases.length + 1,
     purchase_number: `PO-2026-${String(purchases.length + 1).padStart(6, '0')}`,
@@ -831,18 +875,7 @@ function savePurchase(): void {
   };
 
   purchases.push(newPurchase);
-  
-  // Add items to medicine store
-  cart.forEach((item) => {
-    const existingMed = medicineStore.getAll().find((m) => m.id === item.medicine_id);
-    if (existingMed) {
-      medicineStore.updateStock(item.medicine_id, item.quantity);
-    }
-  });
 
-  alert(`Purchase ${newPurchase.purchase_number} created successfully!`);
-  
-  // Reset form
   cart = [];
   selectedSupplier = null;
   loadTab('list');

@@ -79,7 +79,7 @@ class ExpenseService {
 
   async getCategories(): Promise<ExpenseCategory[]> {
     const response = await api.get<{ status: string; data: ExpenseCategory[] }>(
-      '/transactions/expenses/categories'
+      '/transactions/expense-categories'
     );
     return response.data.data;
   }

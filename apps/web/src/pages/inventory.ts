@@ -1,4 +1,5 @@
 import { medicineStore, Medicine } from '../stores/medicine.store';
+import { inventoryService } from '../services/inventory.service';
 
 type InventoryTab = 'overview' | 'batches' | 'low-stock' | 'expiring' | 'expired' | 'movements' | 'adjustments';
 
@@ -41,6 +42,7 @@ export function renderInventory(): string {
 }
 
 export function initInventory(): void {
+  medicineStore.loadMedicines().catch(() => {});
   loadTab('overview');
   initTabs();
 }
@@ -623,14 +625,26 @@ function renderExpired(container: HTMLElement): void {
   });
 }
 
-function renderMovements(container: HTMLElement): void {
-  const movements = [
-    { id: 1, date: '2026-09-13', medicine: 'Paracetamol 500mg', batch: 'P001', type: 'sale', quantity: -10, reference: 'INV-2026-000001' },
-    { id: 2, date: '2026-09-13', medicine: 'Amoxicillin 500mg', batch: 'A001', type: 'purchase', quantity: 100, reference: 'PO-2026-000001' },
-    { id: 3, date: '2026-09-12', medicine: 'Cetirizine 10mg', batch: 'C001', type: 'sale', quantity: -5, reference: 'INV-2026-000002' },
-    { id: 4, date: '2026-09-12', medicine: 'Panadol Extra', batch: 'PE01', type: 'sale', quantity: -20, reference: 'INV-2026-000003' },
-    { id: 5, date: '2026-09-11', medicine: 'Brufen 400mg', batch: 'B001', type: 'adjustment', quantity: -3, reference: 'ADJ-001' },
-  ];
+async function renderMovements(container: HTMLElement): Promise<void> {
+  let movements: any[] = [];
+  try {
+    const { data } = await inventoryService.getStockMovements(100);
+    movements = data.map((m: any) => ({
+      id: m.id,
+      date: m.movement_date,
+      medicine: m.medicine_name,
+      batch: m.batch_number,
+      type: m.movement_type,
+      quantity: m.quantity,
+      reference: m.reference_type ? `${m.reference_type}-${m.reference_id || ''}` : '-',
+    }));
+  } catch {
+    movements = [
+      { id: 1, date: '2026-09-13', medicine: 'Paracetamol 500mg', batch: 'P001', type: 'sale', quantity: -10, reference: 'INV-2026-000001' },
+      { id: 2, date: '2026-09-13', medicine: 'Amoxicillin 500mg', batch: 'A001', type: 'purchase', quantity: 100, reference: 'PO-2026-000001' },
+      { id: 3, date: '2026-09-12', medicine: 'Cetirizine 10mg', batch: 'C001', type: 'sale', quantity: -5, reference: 'INV-2026-000002' },
+    ];
+  }
 
   const typeColors: Record<string, string> = {
     sale: 'badge-danger',

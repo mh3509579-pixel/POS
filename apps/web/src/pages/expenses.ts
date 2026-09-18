@@ -215,6 +215,8 @@ function renderExpensesList(container: HTMLElement): void {
     </div>
 
     <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
           <div class="col-md-2">
             <select class="form-select" id="filterCategory">
               <option value="">All Categories</option>

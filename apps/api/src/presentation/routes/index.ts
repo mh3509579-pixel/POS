@@ -10,6 +10,7 @@ import { customersRoutes } from '../../modules/customers/presentation/customer.r
 import { suppliersRoutes } from '../../modules/suppliers/presentation/supplier.routes.js';
 import { backupRoutes } from '../../modules/backup/presentation/backup.routes.js';
 import { notificationRoutes } from '../../modules/notifications/presentation/notification.routes.js';
+import { inventoryRoutes } from '../../modules/inventory/presentation/inventory.routes.js';
 import { demoRoutes } from './demo.routes.js';
 
 const routes = Router();
@@ -26,5 +27,6 @@ routes.use('/transactions', purchasesRoutes);
 routes.use('/transactions', expensesRoutes);
 routes.use('/backup', backupRoutes);
 routes.use('/notifications', notificationRoutes);
+routes.use('/inventory', inventoryRoutes);
 
 export { routes };

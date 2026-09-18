@@ -1,6 +1,7 @@
 import { medicineStore, Medicine } from '../stores/medicine.store';
 import { printInvoice, InvoiceData } from '../utils/invoice';
 import { authService } from '../services/auth.service';
+import { salesService } from '../services/sales.service';
 
 export function renderPOS(): string {
   return `
@@ -354,7 +355,7 @@ export function initPOS(): () => void {
     alert('Sale held successfully!');
   }
 
-  function completeSale(): void {
+  async function completeSale(): Promise<void> {
     if (cart.length === 0) {
       alert('Cart is empty!');
       return;
@@ -374,6 +375,24 @@ export function initPOS(): () => void {
 
     const user = authService.getUser();
     const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`;
+
+    try {
+      await salesService.create({
+        items: cart.map((item) => ({
+          medicine_id: item.id,
+          batch_number: '',
+          quantity: item.qty,
+          unit_price: item.price,
+          discount: 0,
+        })),
+        discount,
+        tax_rate: taxRate,
+        payment_method: paymentMethod as 'cash' | 'card' | 'credit',
+        amount_paid: received,
+      });
+    } catch (error) {
+      console.warn('API sale creation failed, processing locally:', error);
+    }
 
     const invoiceData: InvoiceData = {
       invoiceNumber,

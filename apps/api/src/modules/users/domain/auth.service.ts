@@ -51,11 +51,15 @@ export class AuthService {
       { expiresIn: '24h' }
     );
 
+    const role = await this.userRepo.findRoleById(user.role_id);
     const { password_hash, ...userWithoutPassword } = user;
     void password_hash;
 
     return {
-      user: userWithoutPassword as Omit<typeof user, 'password_hash'>,
+      user: {
+        ...userWithoutPassword,
+        role_name: role?.name || 'unknown',
+      } as Omit<typeof user, 'password_hash'> & { role_name: string },
       token,
     };
   }

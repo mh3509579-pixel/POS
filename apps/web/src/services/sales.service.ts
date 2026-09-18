@@ -39,7 +39,7 @@ export interface CreateSaleDTO {
   customer_id?: number | null;
   items: {
     medicine_id: number;
-    batch_id: number;
+    batch_number: string;
     quantity: number;
     unit_price: number;
     discount?: number;

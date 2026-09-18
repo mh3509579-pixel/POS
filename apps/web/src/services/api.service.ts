@@ -19,13 +19,17 @@ api.interceptors.response.use(
     if (error.response) {
       console.error('[API Error]', error.response.status, error.response.data);
       if (error.response.status === 401) {
-        const hadToken = localStorage.getItem('auth_token');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        delete api.defaults.headers.common['Authorization'];
-        if (hadToken && !window.location.hash.includes('#reloaded')) {
-          window.location.hash = '#reloaded';
-          window.location.reload();
+        const requestUrl = error.config?.url || '';
+        const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/demo/demo-login') || requestUrl.includes('/auth/register');
+        if (!isAuthRequest) {
+          const hadToken = localStorage.getItem('auth_token');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_user');
+          delete api.defaults.headers.common['Authorization'];
+          if (hadToken && !window.location.hash.includes('#reloaded')) {
+            window.location.hash = '#reloaded';
+            window.location.reload();
+          }
         }
       }
     } else if (error.request) {

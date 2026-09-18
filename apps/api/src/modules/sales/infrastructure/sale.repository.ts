@@ -3,28 +3,127 @@ import { query, queryOne, execute, beginTransaction, commitTransaction, rollback
 
 export class SaleRepository {
   async findById(id: number): Promise<SaleWithItems | null> {
-    const sale = await queryOne<Sale>('SELECT * FROM sales WHERE id = ?', [id]);
+    const sale = await queryOne<any>(
+      `SELECT s.*, c.name as customer_name, u.full_name as user_name
+       FROM sales s
+       LEFT JOIN customers c ON s.customer_id = c.id
+       LEFT JOIN users u ON s.user_id = u.id
+       WHERE s.id = ?`,
+      [id]
+    );
     if (!sale) return null;
 
-    const items = await query<SaleItem[]>('SELECT * FROM sale_items WHERE sale_id = ?', [id]);
-    return { ...sale, items };
+    const items = await query<any[]>(
+      `SELECT si.*, m.name as medicine_name
+       FROM sale_items si
+       LEFT JOIN medicines m ON si.medicine_id = m.id
+       WHERE si.sale_id = ?`,
+      [id]
+    );
+
+    return {
+      id: sale.id,
+      invoice_number: sale.invoice_number,
+      customer_id: sale.customer_id,
+      user_id: sale.user_id,
+      subtotal: sale.subtotal,
+      discount: sale.discount_amount,
+      tax: sale.tax_amount,
+      total: sale.total_amount,
+      payment_method: sale.payment_method,
+      amount_paid: sale.paid_amount,
+      change_amount: sale.change_amount,
+      status: sale.status,
+      notes: sale.notes,
+      created_at: sale.created_at,
+      updated_at: sale.updated_at,
+      items: items.map((item: any) => ({
+        id: item.id,
+        sale_id: item.sale_id,
+        medicine_id: item.medicine_id,
+        batch_number: String(item.batch_id),
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount: item.discount,
+        total: item.total,
+        created_at: item.created_at,
+        medicine_name: item.medicine_name,
+      })),
+      customer_name: sale.customer_name,
+      user_name: sale.user_name,
+    };
   }
 
   async findByInvoiceNumber(invoiceNumber: string): Promise<SaleWithItems | null> {
-    const sale = await queryOne<Sale>('SELECT * FROM sales WHERE invoice_number = ?', [invoiceNumber]);
+    const sale = await queryOne<any>(
+      `SELECT s.*, c.name as customer_name, u.full_name as user_name
+       FROM sales s
+       LEFT JOIN customers c ON s.customer_id = c.id
+       LEFT JOIN users u ON s.user_id = u.id
+       WHERE s.invoice_number = ?`,
+      [invoiceNumber]
+    );
     if (!sale) return null;
 
-    const items = await query<SaleItem[]>('SELECT * FROM sale_items WHERE sale_id = ?', [sale.id]);
-    return { ...sale, items };
+    const items = await query<any[]>(
+      `SELECT si.*, m.name as medicine_name
+       FROM sale_items si
+       LEFT JOIN medicines m ON si.medicine_id = m.id
+       WHERE si.sale_id = ?`,
+      [sale.id]
+    );
+
+    return {
+      id: sale.id,
+      invoice_number: sale.invoice_number,
+      customer_id: sale.customer_id,
+      user_id: sale.user_id,
+      subtotal: sale.subtotal,
+      discount: sale.discount_amount,
+      tax: sale.tax_amount,
+      total: sale.total_amount,
+      payment_method: sale.payment_method,
+      amount_paid: sale.paid_amount,
+      change_amount: sale.change_amount,
+      status: sale.status,
+      notes: sale.notes,
+      created_at: sale.created_at,
+      updated_at: sale.updated_at,
+      items: items.map((item: any) => ({
+        id: item.id,
+        sale_id: item.sale_id,
+        medicine_id: item.medicine_id,
+        batch_number: String(item.batch_id),
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount: item.discount,
+        total: item.total,
+        created_at: item.created_at,
+        medicine_name: item.medicine_name,
+      })),
+      customer_name: sale.customer_name,
+      user_name: sale.user_name,
+    };
   }
 
-  async findAll(limit: number = 50, offset: number = 0): Promise<Sale[]> {
-    return query<Sale[]>('SELECT * FROM sales ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+  async findAll(limit: number = 50, offset: number = 0): Promise<any[]> {
+    return query<any[]>(
+      `SELECT s.*, c.name as customer_name, u.full_name as user_name
+       FROM sales s
+       LEFT JOIN customers c ON s.customer_id = c.id
+       LEFT JOIN users u ON s.user_id = u.id
+       ORDER BY s.created_at DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
   }
 
-  async findByDateRange(startDate: Date, endDate: Date): Promise<Sale[]> {
-    return query<Sale[]>(
-      'SELECT * FROM sales WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC',
+  async findByDateRange(startDate: Date, endDate: Date): Promise<any[]> {
+    return query<any[]>(
+      `SELECT s.*, c.name as customer_name, u.full_name as user_name
+       FROM sales s
+       LEFT JOIN customers c ON s.customer_id = c.id
+       LEFT JOIN users u ON s.user_id = u.id
+       WHERE s.created_at BETWEEN ? AND ? ORDER BY s.created_at DESC`,
       [startDate, endDate]
     );
   }
@@ -38,10 +137,8 @@ export class SaleRepository {
     const connection = await beginTransaction();
 
     try {
-      // Generate invoice number
       const invoiceNumber = await this.getNextInvoiceNumber();
 
-      // Calculate totals
       const subtotal = data.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
       const discount = data.discount || 0;
       const taxable = subtotal - discount;
@@ -49,9 +146,8 @@ export class SaleRepository {
       const tax = taxable * taxRate;
       const total = taxable + tax;
 
-      // Create sale
       const saleResult = await execute(
-        `INSERT INTO sales (invoice_number, customer_id, user_id, subtotal, discount, tax, total, payment_method, amount_paid, change_amount, status, notes)
+        `INSERT INTO sales (invoice_number, customer_id, user_id, subtotal, discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_method, status, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)`,
         [
           invoiceNumber,
@@ -61,36 +157,60 @@ export class SaleRepository {
           discount,
           tax,
           total,
-          data.payment_method,
           data.amount_paid,
           Math.max(0, data.amount_paid - total),
+          data.payment_method,
           data.notes || null,
         ]
       );
 
       const saleId = saleResult.insertId;
 
-      // Create sale items
       for (const item of data.items) {
         const itemTotal = item.unit_price * item.quantity - (item.discount || 0);
+
+        let batchId = 0;
+        if (item.batch_number) {
+          const batch = await queryOne<any>(
+            'SELECT id FROM medicine_batches WHERE medicine_id = ? AND batch_number = ?',
+            [item.medicine_id, item.batch_number]
+          );
+          if (batch) {
+            batchId = batch.id;
+            await execute(
+              'UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?',
+              [item.quantity, batchId]
+            );
+          }
+        }
+
+        if (!batchId) {
+          const defaultBatch = await queryOne<any>(
+            'SELECT id FROM medicine_batches WHERE medicine_id = ? ORDER BY id LIMIT 1',
+            [item.medicine_id]
+          );
+          if (defaultBatch) {
+            batchId = defaultBatch.id;
+            await execute(
+              'UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?',
+              [item.quantity, batchId]
+            );
+          }
+        }
+
         await execute(
-          `INSERT INTO sale_items (sale_id, medicine_id, batch_number, quantity, unit_price, discount, total)
+          `INSERT INTO sale_items (sale_id, medicine_id, batch_id, quantity, unit_price, discount, total)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [saleId, item.medicine_id, item.batch_number, item.quantity, item.unit_price, item.discount || 0, itemTotal]
+          [saleId, item.medicine_id, batchId, item.quantity, item.unit_price, item.discount || 0, itemTotal]
         );
 
-        // Update medicine stock
-        await execute(
-          'UPDATE medicine_batches SET stock = stock - ? WHERE medicine_id = ? AND batch_number = ?',
-          [item.quantity, item.medicine_id, item.batch_number]
-        );
-
-        // Create stock movement
-        await execute(
-          `INSERT INTO stock_movements (medicine_id, batch_number, quantity, movement_type, reference_type, reference_id, notes)
-           VALUES (?, ?, ?, 'sale', 'sale', ?, ?)`,
-          [item.medicine_id, item.batch_number, item.quantity, saleId, `Sale #${invoiceNumber}`]
-        );
+        if (batchId) {
+          await execute(
+            `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
+             VALUES (?, ?, 'sale', ?, 'sale', ?, ?, ?)`,
+            [item.medicine_id, batchId, -item.quantity, saleId, userId, `Sale #${invoiceNumber}`]
+          );
+        }
       }
 
       await commitTransaction(connection);
@@ -119,7 +239,7 @@ export class SaleRepository {
 
   async getDailySales(date: Date): Promise<{ total_sales: number; total_amount: number }> {
     const result = await queryOne<{ total_sales: number; total_amount: number }>(
-      `SELECT COUNT(*) as total_sales, COALESCE(SUM(total), 0) as total_amount 
+      `SELECT COUNT(*) as total_sales, COALESCE(SUM(total_amount), 0) as total_amount 
        FROM sales WHERE DATE(created_at) = ? AND status = 'completed'`,
       [date]
     );
@@ -140,9 +260,9 @@ export class SaleRepository {
     }>(
       `SELECT 
         COUNT(*) as total_sales,
-        COALESCE(SUM(total), 0) as total_amount,
-        COALESCE(SUM(discount), 0) as total_discount,
-        COALESCE(SUM(tax), 0) as total_tax
+        COALESCE(SUM(total_amount), 0) as total_amount,
+        COALESCE(SUM(discount_amount), 0) as total_discount,
+        COALESCE(SUM(tax_amount), 0) as total_tax
        FROM sales 
        WHERE created_at BETWEEN ? AND ? AND status = 'completed'`,
       [startDate, endDate]
