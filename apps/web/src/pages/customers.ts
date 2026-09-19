@@ -1,5 +1,6 @@
 import { createDonutChart, createHorizontalBarChart } from '../utils/charts';
 import { customerService, Customer as ApiCustomer } from '../services/customer.service';
+import { confirmDelete, successToast, errorToast } from '../utils/alerts';
 
 interface Customer {
   id: number;
@@ -219,7 +220,7 @@ async function loadCustomers(): Promise<void> {
       phone: c.phone || '',
       email: c.email || '',
       address: c.address || '',
-      cnic: '',
+      cnic: c.cnic || '',
       type: c.type as 'regular' | 'premium' | 'wholesale',
       credit_limit: c.credit_limit,
       balance: c.current_balance,
@@ -619,25 +620,28 @@ function showCustomerModal(editId?: number): void {
     const name = (modal.querySelector('#custName') as HTMLInputElement).value;
     const phone = (modal.querySelector('#custPhone') as HTMLInputElement).value;
     const email = (modal.querySelector('#custEmail') as HTMLInputElement).value;
+    const cnic = (modal.querySelector('#custCnic') as HTMLInputElement)?.value || '';
     const address = (modal.querySelector('#custAddress') as HTMLTextAreaElement).value;
     const type = (modal.querySelector('#custType') as HTMLSelectElement).value as Customer['type'];
     const creditLimit = parseInt((modal.querySelector('#custCreditLimit') as HTMLInputElement).value) || 50000;
 
     if (!name || !phone) {
-      alert('Please fill required fields (Name, Phone)');
+      errorToast('Please fill required fields (Name, Phone)');
       return;
     }
 
     try {
       if (isEdit && customer) {
-        await customerService.update(customer.id, { name, phone, email, address, type, credit_limit: creditLimit });
+        await customerService.update(customer.id, { name, phone, email, cnic, address, type, credit_limit: creditLimit });
+        successToast('Customer updated successfully!');
       } else {
-        await customerService.create({ name, phone, email, address, type, credit_limit: creditLimit });
+        await customerService.create({ name, phone, email, cnic, address, type, credit_limit: creditLimit });
+        successToast('Customer added successfully!');
       }
       modal.remove();
       await loadCustomers();
     } catch (err) {
-      alert('Failed to save customer. Please try again.');
+      errorToast('Failed to save customer. Please try again.');
     }
   });
 }
@@ -647,17 +651,19 @@ async function deleteCustomer(id: number): Promise<void> {
   if (!customer) return;
 
   if (customer.balance > 0) {
-    alert('Cannot delete customer with outstanding balance!');
+    errorToast('Cannot delete customer with outstanding balance!');
     return;
   }
 
-  if (confirm(`Are you sure you want to delete "${customer.name}"?`)) {
-    try {
-      await customerService.delete(id);
-      await loadCustomers();
-    } catch {
-      alert('Failed to delete customer. Please try again.');
-    }
+  const confirmed = await confirmDelete('customer');
+  if (!confirmed) return;
+
+  try {
+    await customerService.delete(id);
+    successToast('Customer deleted successfully!');
+    await loadCustomers();
+  } catch {
+    errorToast('Failed to delete customer.');
   }
 }
 
@@ -868,12 +874,12 @@ function recordPayment(customer: Customer): void {
     const note = (modal.querySelector('#paymentNote') as HTMLInputElement).value;
 
     if (!amount || amount <= 0) {
-      alert('Please enter a valid amount');
+      errorToast('Please enter a valid amount');
       return;
     }
 
     if (amount > customer.balance) {
-      alert('Amount cannot exceed balance!');
+      errorToast('Amount cannot exceed balance!');
       return;
     }
 
@@ -881,6 +887,6 @@ function recordPayment(customer: Customer): void {
     filteredCustomers = [...customers];
     renderView();
     modal.remove();
-    alert(`Payment of ₨ ${amount.toLocaleString()} recorded successfully!\nNew Balance: ₨ ${customer.balance.toLocaleString()}`);
+    successToast(`Payment of ₨ ${amount.toLocaleString()} recorded successfully! New Balance: ₨ ${customer.balance.toLocaleString()}`);
   });
 }

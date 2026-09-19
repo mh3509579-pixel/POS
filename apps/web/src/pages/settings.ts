@@ -1,3 +1,6 @@
+import { settingsService } from '../services/settings.service';
+import { successToast, errorToast } from '../utils/alerts';
+
 export function renderSettings(): string {
   return `
     <div class="page-header">
@@ -44,7 +47,33 @@ export function renderSettings(): string {
   `;
 }
 
-export function initSettings(): void {
+let cachedSettings: Record<string, { value: string; type: string; module: string; description: string }> = {};
+
+function getSetting(key: string): string {
+  return cachedSettings[key]?.value ?? '';
+}
+
+function populateValues(container: HTMLElement, mapping: Record<string, string>): void {
+  for (const [inputId, settingKey] of Object.entries(mapping)) {
+    const el = container.querySelector('#' + inputId) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+    if (!el) continue;
+    const val = getSetting(settingKey);
+    if (!val) continue;
+    if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+      el.checked = val === 'true' || val === '1';
+    } else {
+      el.value = val;
+    }
+  }
+}
+
+export async function initSettings(): Promise<void> {
+  try {
+    cachedSettings = await settingsService.getAll();
+  } catch {
+    cachedSettings = {};
+  }
+
   loadSettingsTab('pharmacy');
   
   document.querySelectorAll('.settings-nav').forEach((nav) => {
@@ -97,47 +126,47 @@ function renderPharmacySettings(container: HTMLElement): void {
         <div class="row g-3">
           <div class="col-md-8">
             <label class="form-label">Pharmacy Name *</label>
-            <input type="text" class="form-control" value="Hussain Son's Pharmacy">
+            <input type="text" class="form-control" id="pharmacyName" value="Hussain Son's Pharmacy">
           </div>
           <div class="col-md-4">
             <label class="form-label">Registration #</label>
-            <input type="text" class="form-control" value="PHR-2024-12345">
+            <input type="text" class="form-control" id="pharmacyReg" value="PHR-2024-12345">
           </div>
           <div class="col-md-6">
             <label class="form-label">Phone Number *</label>
-            <input type="tel" class="form-control" value="021-12345678">
+            <input type="tel" class="form-control" id="pharmacyPhone" value="021-12345678">
           </div>
           <div class="col-md-6">
             <label class="form-label">Mobile Number *</label>
-            <input type="tel" class="form-control" value="0321-1234567">
+            <input type="tel" class="form-control" id="pharmacyMobile" value="0321-1234567">
           </div>
           <div class="col-md-6">
             <label class="form-label">Email</label>
-            <input type="email" class="form-control" value="info@hussainsons.com">
+            <input type="email" class="form-control" id="pharmacyEmail" value="info@hussainsons.com">
           </div>
           <div class="col-md-6">
             <label class="form-label">Website</label>
-            <input type="url" class="form-control" value="https://hussainsons.com">
+            <input type="url" class="form-control" id="pharmacyWebsite" value="https://hussainsons.com">
           </div>
           <div class="col-md-6">
             <label class="form-label">NTN Number</label>
-            <input type="text" class="form-control" value="1234567-8">
+            <input type="text" class="form-control" id="pharmacyNtn" value="1234567-8">
           </div>
           <div class="col-md-6">
             <label class="form-label">STRN Number</label>
-            <input type="text" class="form-control" value="1712345678901">
+            <input type="text" class="form-control" id="pharmacyStrn" value="1712345678901">
           </div>
           <div class="col-md-6">
             <label class="form-label">Pharmacist Name</label>
-            <input type="text" class="form-control" value="Dr. Ahmed Khan">
+            <input type="text" class="form-control" id="pharmacyPharmacist" value="Dr. Ahmed Khan">
           </div>
           <div class="col-md-6">
             <label class="form-label">Pharmacist License #</label>
-            <input type="text" class="form-control" value="PH-2024-98765">
+            <input type="text" class="form-control" id="pharmacyLicense" value="PH-2024-98765">
           </div>
           <div class="col-md-12">
             <label class="form-label">Address *</label>
-            <textarea class="form-control" rows="2">123 Main Street, Gulshan-e-Iqbal, Karachi, Sindh, Pakistan</textarea>
+            <textarea class="form-control" id="pharmacyAddress" rows="2">123 Main Street, Gulshan-e-Iqbal, Karachi, Sindh, Pakistan</textarea>
           </div>
         </div>
         <button class="btn btn-brand-green mt-3" id="savePharmacyInfo">
@@ -147,8 +176,28 @@ function renderPharmacySettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#savePharmacyInfo')?.addEventListener('click', () => {
-    alert('Pharmacy information saved successfully!');
+  populateValues(container, {
+    pharmacyName: 'pharmacy.name',
+    pharmacyPhone: 'pharmacy.phone',
+    pharmacyEmail: 'pharmacy.email',
+    pharmacyLicense: 'pharmacy.license',
+    pharmacyAddress: 'pharmacy.address',
+  });
+
+  container.querySelector('#savePharmacyInfo')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {
+      'pharmacy.name': (container.querySelector('#pharmacyName') as HTMLInputElement).value,
+      'pharmacy.phone': (container.querySelector('#pharmacyPhone') as HTMLInputElement).value,
+      'pharmacy.email': (container.querySelector('#pharmacyEmail') as HTMLInputElement).value,
+      'pharmacy.license': (container.querySelector('#pharmacyLicense') as HTMLInputElement).value,
+      'pharmacy.address': (container.querySelector('#pharmacyAddress') as HTMLTextAreaElement).value,
+    };
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 }
 
@@ -162,15 +211,15 @@ function renderInvoiceSettings(container: HTMLElement): void {
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Invoice Prefix</label>
-            <input type="text" class="form-control" value="INV-">
+            <input type="text" class="form-control" id="invoicePrefix" value="INV-">
           </div>
           <div class="col-md-6">
             <label class="form-label">Starting Number</label>
-            <input type="number" class="form-control" value="1">
+            <input type="number" class="form-control" id="invoiceNextNumber" value="1">
           </div>
           <div class="col-md-6">
             <label class="form-label">Invoice Template</label>
-            <select class="form-select">
+            <select class="form-select" id="invoiceTemplate">
               <option value="standard" selected>Standard</option>
               <option value="minimal">Minimal</option>
               <option value="detailed">Detailed</option>
@@ -178,7 +227,7 @@ function renderInvoiceSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Paper Size</label>
-            <select class="form-select">
+            <select class="form-select" id="invoicePaperSize">
               <option value="thermal" selected>Thermal (80mm)</option>
               <option value="a5">A5</option>
               <option value="a4">A4</option>
@@ -186,11 +235,11 @@ function renderInvoiceSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-12">
             <label class="form-label">Invoice Header Text</label>
-            <textarea class="form-control" rows="2">Thank you for choosing Hussain Son's Pharmacy!</textarea>
+            <textarea class="form-control" id="invoiceHeaderText" rows="2">Thank you for choosing Hussain Son's Pharmacy!</textarea>
           </div>
           <div class="col-md-12">
             <label class="form-label">Invoice Footer Text</label>
-            <textarea class="form-control" rows="2">For complaints, contact: 021-12345678 | Visit us at hussainsons.com</textarea>
+            <textarea class="form-control" id="invoiceFooterText" rows="2">For complaints, contact: 021-12345678 | Visit us at hussainsons.com</textarea>
           </div>
           <div class="col-md-6">
             <div class="form-check form-switch">
@@ -224,8 +273,26 @@ function renderInvoiceSettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#saveInvoiceSettings')?.addEventListener('click', () => {
-    alert('Invoice settings saved successfully!');
+  populateValues(container, {
+    invoicePrefix: 'invoice.prefix',
+    invoiceNextNumber: 'invoice.next_number',
+    showLogo: 'invoice.show_logo',
+    invoiceFooterText: 'invoice.footer_text',
+  });
+
+  container.querySelector('#saveInvoiceSettings')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {
+      'invoice.prefix': (container.querySelector('#invoicePrefix') as HTMLInputElement).value,
+      'invoice.next_number': (container.querySelector('#invoiceNextNumber') as HTMLInputElement).value,
+      'invoice.show_logo': (container.querySelector('#showLogo') as HTMLInputElement).checked ? 'true' : 'false',
+      'invoice.footer_text': (container.querySelector('#invoiceFooterText') as HTMLTextAreaElement).value,
+    };
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 }
 
@@ -239,19 +306,19 @@ function renderTaxSettings(container: HTMLElement): void {
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">GST Rate (%)</label>
-            <input type="number" class="form-control" value="5" step="0.5">
+            <input type="number" class="form-control" id="taxRate" value="5" step="0.5">
           </div>
           <div class="col-md-6">
             <label class="form-label">Sales Tax Number</label>
-            <input type="text" class="form-control" value="1712345678901">
+            <input type="text" class="form-control" id="taxGstNumber" value="1712345678901">
           </div>
           <div class="col-md-6">
             <label class="form-label">Default Discount (%)</label>
-            <input type="number" class="form-control" value="0" min="0" max="100">
+            <input type="number" class="form-control" id="taxDefaultDiscount" value="0" min="0" max="100">
           </div>
           <div class="col-md-6">
             <label class="form-label">Maximum Discount (%)</label>
-            <input type="number" class="form-control" value="20" min="0" max="100">
+            <input type="number" class="form-control" id="taxMaxDiscount" value="20" min="0" max="100">
           </div>
           <div class="col-md-12">
             <div class="form-check form-switch">
@@ -273,8 +340,22 @@ function renderTaxSettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#saveTaxSettings')?.addEventListener('click', () => {
-    alert('Tax settings saved successfully!');
+  populateValues(container, {
+    taxRate: 'tax.rate',
+    taxGstNumber: 'tax.gst_number',
+  });
+
+  container.querySelector('#saveTaxSettings')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {
+      'tax.rate': (container.querySelector('#taxRate') as HTMLInputElement).value,
+      'tax.gst_number': (container.querySelector('#taxGstNumber') as HTMLInputElement).value,
+    };
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 }
 
@@ -301,11 +382,11 @@ function renderNotificationSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Low Stock Threshold</label>
-            <input type="number" class="form-control" value="50">
+            <input type="number" class="form-control" id="lowStockThreshold" value="50">
           </div>
           <div class="col-md-6">
             <label class="form-label">Alert Email</label>
-            <input type="email" class="form-control" value="admin@hussainsons.com">
+            <input type="email" class="form-control" id="alertEmail" value="admin@hussainsons.com">
           </div>
         </div>
 
@@ -325,7 +406,7 @@ function renderNotificationSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Expiry Alert Days</label>
-            <input type="number" class="form-control" value="30">
+            <input type="number" class="form-control" id="expiryDays" value="30">
           </div>
         </div>
 
@@ -351,8 +432,22 @@ function renderNotificationSettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#saveNotificationSettings')?.addEventListener('click', () => {
-    alert('Notification settings saved successfully!');
+  populateValues(container, {
+    lowStockThreshold: 'notification.low_stock_threshold',
+    expiryDays: 'notification.expiry_days',
+  });
+
+  container.querySelector('#saveNotificationSettings')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {
+      'notification.low_stock_threshold': (container.querySelector('#lowStockThreshold') as HTMLInputElement).value,
+      'notification.expiry_days': (container.querySelector('#expiryDays') as HTMLInputElement).value,
+    };
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 }
 
@@ -366,7 +461,7 @@ function renderReceiptSettings(container: HTMLElement): void {
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Printer Type</label>
-            <select class="form-select">
+            <select class="form-select" id="receiptPrinterType">
               <option value="thermal" selected>Thermal Printer</option>
               <option value="inkjet">Inkjet Printer</option>
               <option value="laser">Laser Printer</option>
@@ -375,7 +470,7 @@ function renderReceiptSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Printer Port</label>
-            <select class="form-select">
+            <select class="form-select" id="receiptPrinterPort">
               <option value="usb" selected>USB</option>
               <option value="serial">Serial (COM1)</option>
               <option value="parallel">Parallel (LPT1)</option>
@@ -384,7 +479,7 @@ function renderReceiptSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Paper Width</label>
-            <select class="form-select">
+            <select class="form-select" id="receiptPaperWidth">
               <option value="58" selected>58mm</option>
               <option value="80">80mm</option>
               <option value="a4">A4</option>
@@ -392,7 +487,7 @@ function renderReceiptSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Copies</label>
-            <input type="number" class="form-control" value="1" min="1" max="5">
+            <input type="number" class="form-control" id="receiptCopies" value="1" min="1" max="5">
           </div>
           <div class="col-md-12">
             <div class="form-check form-switch">
@@ -419,12 +514,24 @@ function renderReceiptSettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#saveReceiptSettings')?.addEventListener('click', () => {
-    alert('Receipt printer settings saved successfully!');
+  populateValues(container, {
+    receiptPaperWidth: 'pos.receipt_width',
+  });
+
+  container.querySelector('#saveReceiptSettings')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {
+      'pos.receipt_width': (container.querySelector('#receiptPaperWidth') as HTMLSelectElement).value,
+    };
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 
   container.querySelector('#testPrintBtn')?.addEventListener('click', () => {
-    alert('Test print sent to printer!');
+    successToast('Test print sent to printer!');
   });
 }
 
@@ -439,11 +546,11 @@ function renderSecuritySettings(container: HTMLElement): void {
         <div class="row g-3 mb-4">
           <div class="col-md-6">
             <label class="form-label">Minimum Password Length</label>
-            <input type="number" class="form-control" value="8" min="6">
+            <input type="number" class="form-control" id="securityPasswordMinLength" value="8" min="6">
           </div>
           <div class="col-md-6">
             <label class="form-label">Password Expiry (Days)</label>
-            <input type="number" class="form-control" value="90" min="30">
+            <input type="number" class="form-control" id="securityPasswordExpiry" value="90" min="30">
           </div>
           <div class="col-md-6">
             <div class="form-check form-switch">
@@ -469,11 +576,11 @@ function renderSecuritySettings(container: HTMLElement): void {
         <div class="row g-3 mb-4">
           <div class="col-md-6">
             <label class="form-label">Session Timeout (Minutes)</label>
-            <input type="number" class="form-control" value="30" min="5">
+            <input type="number" class="form-control" id="securitySessionTimeout" value="30" min="5">
           </div>
           <div class="col-md-6">
             <label class="form-label">Max Login Attempts</label>
-            <input type="number" class="form-control" value="5" min="3">
+            <input type="number" class="form-control" id="securityMaxLoginAttempts" value="5" min="3">
           </div>
           <div class="col-md-6">
             <div class="form-check form-switch">
@@ -505,7 +612,7 @@ function renderSecuritySettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Keep Audit Logs (Days)</label>
-            <input type="number" class="form-control" value="90" min="30">
+            <input type="number" class="form-control" id="securityAuditLogRetention" value="90" min="30">
           </div>
         </div>
         <button class="btn btn-brand-green mt-3" id="saveSecuritySettings">
@@ -515,8 +622,24 @@ function renderSecuritySettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#saveSecuritySettings')?.addEventListener('click', () => {
-    alert('Security settings saved successfully!');
+  populateValues(container, {
+    securityPasswordMinLength: 'security.password_min_length',
+    securitySessionTimeout: 'security.session_timeout',
+    securityMaxLoginAttempts: 'security.max_login_attempts',
+  });
+
+  container.querySelector('#saveSecuritySettings')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {
+      'security.password_min_length': (container.querySelector('#securityPasswordMinLength') as HTMLInputElement).value,
+      'security.session_timeout': (container.querySelector('#securitySessionTimeout') as HTMLInputElement).value,
+      'security.max_login_attempts': (container.querySelector('#securityMaxLoginAttempts') as HTMLInputElement).value,
+    };
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 }
 
@@ -531,7 +654,7 @@ function renderSystemSettings(container: HTMLElement): void {
         <div class="row g-3 mb-4">
           <div class="col-md-6">
             <label class="form-label">Currency</label>
-            <select class="form-select">
+            <select class="form-select" id="systemCurrency">
               <option value="pkr" selected>Pakistani Rupee (₨)</option>
               <option value="usd">US Dollar ($)</option>
               <option value="eur">Euro (€)</option>
@@ -539,7 +662,7 @@ function renderSystemSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Date Format</label>
-            <select class="form-select">
+            <select class="form-select" id="systemDateFormat">
               <option value="ymd" selected>YYYY-MM-DD</option>
               <option value="dmy">DD/MM/YYYY</option>
               <option value="mdy">MM/DD/YYYY</option>
@@ -547,7 +670,7 @@ function renderSystemSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Timezone</label>
-            <select class="form-select">
+            <select class="form-select" id="systemTimezone">
               <option value="pk" selected>Pakistan (PKT +5:00)</option>
               <option value="uae">UAE (GST +4:00)</option>
               <option value="uk">UK (GMT +0:00)</option>
@@ -555,7 +678,7 @@ function renderSystemSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Language</label>
-            <select class="form-select">
+            <select class="form-select" id="systemLanguage">
               <option value="en" selected>English</option>
               <option value="ur">Urdu</option>
             </select>
@@ -578,7 +701,7 @@ function renderSystemSettings(container: HTMLElement): void {
           </div>
           <div class="col-md-6">
             <label class="form-label">Items Per Page</label>
-            <select class="form-select">
+            <select class="form-select" id="systemItemsPerPage">
               <option value="10">10</option>
               <option value="20" selected>20</option>
               <option value="50">50</option>
@@ -591,19 +714,19 @@ function renderSystemSettings(container: HTMLElement): void {
         <div class="row g-3 mb-4">
           <div class="col-md-6">
             <label class="form-label">Database Host</label>
-            <input type="text" class="form-control" value="localhost">
+            <input type="text" class="form-control" id="systemDbHost" value="localhost">
           </div>
           <div class="col-md-6">
             <label class="form-label">Database Name</label>
-            <input type="text" class="form-control" value="pharmacy_pos">
+            <input type="text" class="form-control" id="systemDbName" value="pharmacy_pos">
           </div>
           <div class="col-md-6">
             <label class="form-label">Database Port</label>
-            <input type="number" class="form-control" value="3306">
+            <input type="number" class="form-control" id="systemDbPort" value="3306">
           </div>
           <div class="col-md-6">
             <label class="form-label">Connection Pool Size</label>
-            <input type="number" class="form-control" value="10" min="5" max="50">
+            <input type="number" class="form-control" id="systemDbPoolSize" value="10" min="5" max="50">
           </div>
         </div>
 
@@ -619,7 +742,13 @@ function renderSystemSettings(container: HTMLElement): void {
     </div>
   `;
 
-  container.querySelector('#saveSystemSettings')?.addEventListener('click', () => {
-    alert('System settings saved successfully!');
+  container.querySelector('#saveSystemSettings')?.addEventListener('click', async () => {
+    const settings: Record<string, string> = {};
+    try {
+      await settingsService.save(settings);
+      successToast('Settings saved successfully!');
+    } catch {
+      errorToast('Failed to save settings.');
+    }
   });
 }

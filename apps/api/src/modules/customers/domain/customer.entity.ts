@@ -6,6 +6,7 @@ export interface Customer {
   type: CustomerType;
   phone: string | null;
   email: string | null;
+  cnic: string | null;
   address: string | null;
   city: string | null;
   credit_limit: number;
@@ -23,6 +24,7 @@ export interface CreateCustomerDTO {
   type?: CustomerType;
   phone?: string;
   email?: string;
+  cnic?: string;
   address?: string;
   city?: string;
   credit_limit?: number;
@@ -34,6 +36,7 @@ export interface UpdateCustomerDTO {
   type?: CustomerType;
   phone?: string;
   email?: string;
+  cnic?: string;
   address?: string;
   city?: string;
   credit_limit?: number;

@@ -1,3 +1,6 @@
+import { reportsService } from '../services/reports.service';
+import { inventoryService } from '../services/inventory.service';
+
 type ReportsTab = 'sales' | 'purchases' | 'financial' | 'inventory';
 
 export function renderReports(): string {
@@ -285,17 +288,34 @@ function createDonutChart(data: { labels: string[]; values: number[]; colors: st
   `;
 }
 
-function renderSalesReports(container: HTMLElement): void {
+async function renderSalesReports(container: HTMLElement): Promise<void> {
+  let summary = { total_sales: 0, total_revenue: 0, total_discount: 0, total_tax: 0, avg_sale_value: 0 };
+  let daily: { date: string; count: number; amount: number }[] = [];
+  let topMedicines: { name: string; total_qty: number; total_amount: number }[] = [];
+  let paymentMethods: { payment_method: string; count: number; amount: number }[] = [];
+
+  try {
+    const data = await reportsService.getSalesReport();
+    summary = data.summary || summary;
+    daily = data.daily || [];
+    topMedicines = data.topMedicines || [];
+    paymentMethods = data.paymentMethods || [];
+  } catch { /* use defaults */ }
+
+  const dailyLabels = daily.map((d) => new Date(d.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+  const dailyAmounts = daily.map((d) => Number(d.amount || 0));
+  const pmColors = ['#198754', '#0d6efd', '#ffc107', '#0dcaf0', '#dc3545'];
+
   container.innerHTML = `
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 1,538</div>
-              <div class="stat-label">Today's Sales</div>
+              <div class="stat-value">₨ ${Number(summary.total_revenue || 0).toLocaleString()}</div>
+              <div class="stat-label">Total Revenue</div>
             </div>
-            <div class="stat-icon green"><i class="bi bi-cart-check"></i></div>
+            <div class="stat-icon green"><i class="bi bi-currency-rupee"></i></div>
           </div>
         </div>
       </div>
@@ -303,10 +323,10 @@ function renderSalesReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 45,250</div>
-              <div class="stat-label">This Week</div>
+              <div class="stat-value">${summary.total_sales || 0}</div>
+              <div class="stat-label">Total Sales</div>
             </div>
-            <div class="stat-icon blue"><i class="bi bi-calendar-week"></i></div>
+            <div class="stat-icon blue"><i class="bi bi-receipt"></i></div>
           </div>
         </div>
       </div>
@@ -314,10 +334,10 @@ function renderSalesReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 1,85,000</div>
-              <div class="stat-label">This Month</div>
+              <div class="stat-value">₨ ${Number(summary.total_discount || 0).toLocaleString()}</div>
+              <div class="stat-label">Total Discount</div>
             </div>
-            <div class="stat-icon orange"><i class="bi bi-calendar-month"></i></div>
+            <div class="stat-icon orange"><i class="bi bi-percent"></i></div>
           </div>
         </div>
       </div>
@@ -325,8 +345,8 @@ function renderSalesReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 22,50,000</div>
-              <div class="stat-label">This Year</div>
+              <div class="stat-value">₨ ${Number(summary.avg_sale_value || 0).toLocaleString()}</div>
+              <div class="stat-label">Avg Sale Value</div>
             </div>
             <div class="stat-icon green"><i class="bi bi-graph-up-arrow"></i></div>
           </div>
@@ -337,83 +357,31 @@ function renderSalesReports(container: HTMLElement): void {
     <div class="row g-4 mb-4">
       <div class="col-md-8">
         <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Daily Sales Trend</h6>
-            <select class="form-select form-select-sm" style="width: auto;">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-              <option>This Month</option>
-            </select>
-          </div>
+          <div class="card-header"><h6 class="mb-0">Daily Sales Trend</h6></div>
           <div class="card-body">
-            ${createLineChart({
-              labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-              datasets: [
-                { name: 'Sales', values: [12500, 8200, 15800, 10200, 18500, 14200, 7800], color: '#198754' },
-                { name: 'Last Week', values: [10000, 12000, 9500, 14000, 11000, 16000, 8500], color: '#0d6efd' },
-              ]
-            }, 280)}
+            ${dailyLabels.length > 0
+              ? createBarChart({ labels: dailyLabels, values: dailyAmounts, colors: dailyLabels.map(() => '#198754') })
+              : '<div class="text-center text-muted py-5">No sales data available</div>'}
           </div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Payment Methods</h6>
-          </div>
+          <div class="card-header"><h6 class="mb-0">Payment Methods</h6></div>
           <div class="card-body">
-            ${createDonutChart({
-              labels: ['Cash', 'Card', 'Credit'],
-              values: [65, 25, 10],
-              colors: ['#198754', '#0d6efd', '#ffc107']
-            }, 180)}
-            <div class="mt-3">
-              <div class="d-flex justify-content-between mb-2">
-                <span><i class="bi bi-cash me-2 text-success"></i>Cash</span>
-                <span class="fw-semibold">₨ 1,20,250</span>
+            ${paymentMethods.length > 0
+              ? createDonutChart({
+                  labels: paymentMethods.map((p) => p.payment_method),
+                  values: paymentMethods.map((p) => Number(p.amount || 0)),
+                  colors: paymentMethods.map((_, i) => pmColors[i % pmColors.length])
+                })
+              : '<div class="text-center text-muted">No payment data</div>'}
+            ${paymentMethods.map((p) => `
+              <div class="d-flex justify-content-between mb-2 mt-2">
+                <span class="text-capitalize"><i class="bi bi-cash me-2"></i>${p.payment_method}</span>
+                <span class="fw-semibold">₨ ${Number(p.amount || 0).toLocaleString()} (${p.count})</span>
               </div>
-              <div class="d-flex justify-content-between mb-2">
-                <span><i class="bi bi-credit-card me-2 text-primary"></i>Card</span>
-                <span class="fw-semibold">₨ 46,250</span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span><i class="bi bi-clock me-2 text-warning"></i>Credit</span>
-                <span class="fw-semibold">₨ 18,500</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Monthly Sales Comparison</h6>
-          </div>
-          <div class="card-body">
-            ${createBarChart({
-              labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-              values: [180000, 240000, 200000, 260000, 290000, 185000],
-              colors: ['#0d6efd', '#198754', '#0d6efd', '#198754', '#ffc107', '#198754']
-            }, 220)}
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Sales vs Returns</h6>
-          </div>
-          <div class="card-body">
-            ${createLineChart({
-              labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-              datasets: [
-                { name: 'Sales', values: [150000, 180000, 165000, 180000, 240000, 200000], color: '#198754' },
-                { name: 'Returns', values: [5000, 8000, 3000, 6000, 4500, 7000], color: '#dc3545' },
-              ]
-            }, 220)}
+            `).join('')}
           </div>
         </div>
       </div>
@@ -422,41 +390,14 @@ function renderSalesReports(container: HTMLElement): void {
     <div class="row g-4">
       <div class="col-md-6">
         <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Top Selling Medicines</h6>
-          </div>
+          <div class="card-header"><h6 class="mb-0">Top Selling Medicines</h6></div>
           <div class="card-body p-0">
             <table class="table table-hover mb-0">
-              <thead>
-                <tr><th>#</th><th>Medicine</th><th class="text-end">Qty Sold</th><th class="text-end">Revenue</th></tr>
-              </thead>
+              <thead><tr><th>#</th><th>Medicine</th><th class="text-end">Qty Sold</th><th class="text-end">Revenue</th></tr></thead>
               <tbody>
-                <tr><td>1</td><td>Paracetamol 500mg</td><td class="text-end">450</td><td class="text-end">₨ 22,500</td></tr>
-                <tr><td>2</td><td>Amoxicillin 500mg</td><td class="text-end">320</td><td class="text-end">₨ 38,400</td></tr>
-                <tr><td>3</td><td>Cetirizine 10mg</td><td class="text-end">280</td><td class="text-end">₨ 9,800</td></tr>
-                <tr><td>4</td><td>Augmentin 625mg</td><td class="text-end">210</td><td class="text-end">₨ 58,800</td></tr>
-                <tr><td>5</td><td>Nexium 40mg</td><td class="text-end">180</td><td class="text-end">₨ 81,000</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Top Customers</h6>
-          </div>
-          <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-              <thead>
-                <tr><th>#</th><th>Customer</th><th>Type</th><th class="text-end">Purchases</th></tr>
-              </thead>
-              <tbody>
-                <tr><td>1</td><td>MedCity Hospital</td><td><span class="badge bg-success">Wholesale</span></td><td class="text-end">₨ 25,00,000</td></tr>
-                <tr><td>2</td><td>Kamran Brothers</td><td><span class="badge bg-success">Wholesale</span></td><td class="text-end">₨ 18,00,000</td></tr>
-                <tr><td>3</td><td>Fatima Shah</td><td><span class="badge bg-warning">Premium</span></td><td class="text-end">₨ 3,80,000</td></tr>
-                <tr><td>4</td><td>Sara Malik</td><td><span class="badge bg-warning">Premium</span></td><td class="text-end">₨ 1,95,000</td></tr>
-                <tr><td>5</td><td>Ahmed Khan</td><td><span class="badge bg-info">Regular</span></td><td class="text-end">₨ 1,25,000</td></tr>
+                ${topMedicines.length > 0
+                  ? topMedicines.map((m, i) => `<tr><td>${i + 1}</td><td>${m.name}</td><td class="text-end">${m.total_qty}</td><td class="text-end">₨ ${Number(m.total_amount).toLocaleString()}</td></tr>`).join('')
+                  : '<tr><td colspan="4" class="text-center text-muted">No data</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -466,15 +407,29 @@ function renderSalesReports(container: HTMLElement): void {
   `;
 }
 
-function renderPurchaseReports(container: HTMLElement): void {
+async function renderPurchaseReports(container: HTMLElement): Promise<void> {
+  let summary = { total_purchases: 0, total_cost: 0, total_discount: 0, total_tax: 0 };
+  let daily: { date: string; count: number; amount: number }[] = [];
+  let topSuppliers: { name: string; order_count: number; total_amount: number }[] = [];
+
+  try {
+    const data = await reportsService.getPurchasesReport();
+    summary = data.summary || summary;
+    daily = data.daily || [];
+    topSuppliers = data.topSuppliers || [];
+  } catch { /* use defaults */ }
+
+  const dailyLabels = daily.map((d) => new Date(d.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+  const dailyAmounts = daily.map((d) => Number(d.amount || 0));
+
   container.innerHTML = `
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 40,000</div>
-              <div class="stat-label">Today's Purchases</div>
+              <div class="stat-value">${summary.total_purchases || 0}</div>
+              <div class="stat-label">Total Purchases</div>
             </div>
             <div class="stat-icon green"><i class="bi bi-cart-plus"></i></div>
           </div>
@@ -484,10 +439,10 @@ function renderPurchaseReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 2,85,000</div>
-              <div class="stat-label">This Month</div>
+              <div class="stat-value">₨ ${Number(summary.total_cost || 0).toLocaleString()}</div>
+              <div class="stat-label">Total Cost</div>
             </div>
-            <div class="stat-icon blue"><i class="bi bi-calendar-month"></i></div>
+            <div class="stat-icon blue"><i class="bi bi-currency-rupee"></i></div>
           </div>
         </div>
       </div>
@@ -495,10 +450,10 @@ function renderPurchaseReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">₨ 2,95,000</div>
-              <div class="stat-label">Pending Payments</div>
+              <div class="stat-value">₨ ${Number(summary.total_discount || 0).toLocaleString()}</div>
+              <div class="stat-label">Total Discount</div>
             </div>
-            <div class="stat-icon red"><i class="bi bi-exclamation-triangle"></i></div>
+            <div class="stat-icon orange"><i class="bi bi-percent"></i></div>
           </div>
         </div>
       </div>
@@ -506,10 +461,10 @@ function renderPurchaseReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">42</div>
-              <div class="stat-label">Orders This Month</div>
+              <div class="stat-value">₨ ${Number(summary.total_tax || 0).toLocaleString()}</div>
+              <div class="stat-label">Total Tax</div>
             </div>
-            <div class="stat-icon orange"><i class="bi bi-receipt"></i></div>
+            <div class="stat-icon red"><i class="bi bi-receipt"></i></div>
           </div>
         </div>
       </div>
@@ -518,70 +473,56 @@ function renderPurchaseReports(container: HTMLElement): void {
     <div class="row g-4 mb-4">
       <div class="col-md-8">
         <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Monthly Purchase Trend</h6>
-            <select class="form-select form-select-sm" style="width: auto;">
-              <option>Last 6 Months</option>
-              <option>This Year</option>
-            </select>
-          </div>
+          <div class="card-header"><h6 class="mb-0">Daily Purchase Trend</h6></div>
           <div class="card-body">
-            ${createLineChart({
-              labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-              datasets: [
-                { name: 'Purchases', values: [180000, 240000, 200000, 260000, 285000, 220000], color: '#0d6efd' },
-                { name: 'Payments', values: [150000, 200000, 180000, 220000, 250000, 195000], color: '#198754' },
-              ]
-            }, 280)}
+            ${dailyLabels.length > 0
+              ? createBarChart({ labels: dailyLabels, values: dailyAmounts, colors: dailyLabels.map(() => '#0d6efd') })
+              : '<div class="text-center text-muted py-5">No purchase data available</div>'}
           </div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Supplier-wise Purchases</h6>
-          </div>
-          <div class="card-body">
-            ${createDonutChart({
-              labels: ['Global Pharma', 'Karachi Pharma', 'Lahore Medical', 'Others'],
-              values: [50, 25, 18, 20.5],
-              colors: ['#198754', '#0d6efd', '#ffc107', '#6c757d']
-            }, 180)}
+          <div class="card-header"><h6 class="mb-0">Top Suppliers</h6></div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>Supplier</th><th class="text-end">Orders</th><th class="text-end">Amount</th></tr></thead>
+              <tbody>
+                ${topSuppliers.length > 0
+                  ? topSuppliers.map((s) => `<tr><td>${s.name}</td><td class="text-end">${s.order_count}</td><td class="text-end">₨ ${Number(s.total_amount).toLocaleString()}</td></tr>`).join('')
+                  : '<tr><td colspan="3" class="text-center text-muted">No data</td></tr>'}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <h6 class="mb-0">Pending Supplier Payments</h6>
-      </div>
-      <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr><th>Supplier</th><th>Last Purchase</th><th class="text-end">Total Purchases</th><th class="text-end">Amount Paid</th><th class="text-end">Balance Due</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Global Pharma Imports</td><td>2026-09-08</td><td class="text-end">₨ 50,00,000</td><td class="text-end">₨ 48,75,000</td><td class="text-end text-danger fw-semibold">₨ 1,25,000</td><td><span class="badge bg-warning">Pending</span></td></tr>
-            <tr><td>Karachi Pharma Wholesalers</td><td>2026-09-13</td><td class="text-end">₨ 25,00,000</td><td class="text-end">₨ 24,15,000</td><td class="text-end text-danger fw-semibold">₨ 85,000</td><td><span class="badge bg-warning">Pending</span></td></tr>
-            <tr><td>Lahore Medical Suppliers</td><td>2026-09-12</td><td class="text-end">₨ 18,00,000</td><td class="text-end">₨ 17,58,000</td><td class="text-end text-danger fw-semibold">₨ 42,000</td><td><span class="badge bg-warning">Pending</span></td></tr>
-            <tr><td>Peshawar Pharma</td><td>2026-09-05</td><td class="text-end">₨ 6,80,000</td><td class="text-end">₨ 6,52,000</td><td class="text-end text-danger fw-semibold">₨ 28,000</td><td><span class="badge bg-warning">Pending</span></td></tr>
-            <tr><td>Al-Rehman Medical Store</td><td>2026-09-01</td><td class="text-end">₨ 4,20,000</td><td class="text-end">₨ 4,05,000</td><td class="text-end text-danger fw-semibold">₨ 15,000</td><td><span class="badge bg-warning">Pending</span></td></tr>
-          </tbody>
-        </table>
       </div>
     </div>
   `;
 }
 
-function renderFinancialReports(container: HTMLElement): void {
+async function renderFinancialReports(container: HTMLElement): Promise<void> {
+  let pl = { revenue: 0, cogs: 0, grossProfit: 0, totalExpenses: 0, netProfit: 0, profitMargin: 0 };
+  let expensesByCategory: { category_name: string; amount: number; count: number }[] = [];
+
+  try {
+    pl = await reportsService.getProfitLoss();
+  } catch { /* use defaults */ }
+
+  try {
+    const expData = await reportsService.getExpensesReport();
+    expensesByCategory = expData.byCategory || [];
+  } catch { /* use defaults */ }
+
+  const grossMargin = pl.revenue > 0 ? ((pl.grossProfit / pl.revenue) * 100).toFixed(1) : '0';
+  const expColors = ['#0d6efd', '#198754', '#ffc107', '#0dcaf0', '#dc3545', '#6c757d'];
+
   container.innerHTML = `
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value text-success">₨ 22,50,000</div>
+              <div class="stat-value text-success">₨ ${pl.revenue.toLocaleString()}</div>
               <div class="stat-label">Total Revenue</div>
             </div>
             <div class="stat-icon green"><i class="bi bi-arrow-up-circle"></i></div>
@@ -592,7 +533,7 @@ function renderFinancialReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value text-danger">₨ 15,25,000</div>
+              <div class="stat-value text-danger">₨ ${pl.cogs.toLocaleString()}</div>
               <div class="stat-label">Cost of Goods</div>
             </div>
             <div class="stat-icon red"><i class="bi bi-arrow-down-circle"></i></div>
@@ -603,7 +544,7 @@ function renderFinancialReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value text-success">₨ 7,25,000</div>
+              <div class="stat-value text-success">₨ ${pl.grossProfit.toLocaleString()}</div>
               <div class="stat-label">Gross Profit</div>
             </div>
             <div class="stat-icon green"><i class="bi bi-cash"></i></div>
@@ -614,8 +555,8 @@ function renderFinancialReports(container: HTMLElement): void {
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">32.2%</div>
-              <div class="stat-label">Profit Margin</div>
+              <div class="stat-value">${grossMargin}%</div>
+              <div class="stat-label">Gross Margin</div>
             </div>
             <div class="stat-icon blue"><i class="bi bi-percent"></i></div>
           </div>
@@ -626,102 +567,38 @@ function renderFinancialReports(container: HTMLElement): void {
     <div class="row g-4 mb-4">
       <div class="col-md-8">
         <div class="card">
-          <div class="card-header">
-            <h6 class="mb-0">Revenue vs Expenses vs Profit</h6>
-          </div>
+          <div class="card-header"><h6 class="mb-0">Profit & Loss Summary</h6></div>
           <div class="card-body">
-            ${createLineChart({
-              labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-              datasets: [
-                { name: 'Revenue', values: [180000, 200000, 190000, 220000, 280000, 250000, 260000, 290000, 185000], color: '#198754' },
-                { name: 'Expenses', values: [120000, 130000, 125000, 140000, 160000, 150000, 155000, 170000, 140000], color: '#dc3545' },
-                { name: 'Profit', values: [60000, 70000, 65000, 80000, 120000, 100000, 105000, 120000, 45000], color: '#0d6efd' },
-              ]
-            }, 300)}
+            <table class="table">
+              <tbody>
+                <tr><td>Revenue (Sales)</td><td class="text-end fw-semibold">₨ ${pl.revenue.toLocaleString()}</td></tr>
+                <tr><td>Cost of Goods Sold</td><td class="text-end text-danger">-₨ ${pl.cogs.toLocaleString()}</td></tr>
+                <tr class="table-light"><td><strong>Gross Profit</strong></td><td class="text-end fw-bold text-success"><strong>₨ ${pl.grossProfit.toLocaleString()}</strong></td></tr>
+                <tr><td>Operating Expenses</td><td class="text-end text-danger">-₨ ${pl.totalExpenses.toLocaleString()}</td></tr>
+                <tr class="table-light"><td><strong>Net Profit</strong></td><td class="text-end fw-bold ${pl.netProfit >= 0 ? 'text-success' : 'text-danger'}"><strong>₨ ${pl.netProfit.toLocaleString()}</strong></td></tr>
+                <tr><td>Profit Margin</td><td class="text-end fw-semibold">${pl.profitMargin.toFixed(1)}%</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Expense Distribution</h6>
-          </div>
+          <div class="card-header"><h6 class="mb-0">Expense Distribution</h6></div>
           <div class="card-body">
-            ${createDonutChart({
-              labels: ['Rent', 'Salaries', 'Utilities', 'Marketing', 'Others'],
-              values: [50000, 120000, 22500, 8500, 64700],
-              colors: ['#0d6efd', '#198754', '#ffc107', '#0dcaf0', '#6c757d']
-            }, 180)}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Monthly Profit Trend</h6>
-          </div>
-          <div class="card-body">
-            ${createBarChart({
-              labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-              values: [80000, 120000, 100000, 105000, 120000, 45000],
-              colors: ['#198754', '#198754', '#198754', '#198754', '#198754', '#ffc107']
-            }, 220)}
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Gross Margin Trend</h6>
-          </div>
-          <div class="card-body">
-            ${createLineChart({
-              labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-              datasets: [
-                { name: 'Margin %', values: [33, 35, 34, 36, 42, 40], color: '#0d6efd' },
-              ]
-            }, 220)}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-4">
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header"><h6 class="mb-0">Accounts Receivable</h6></div>
-          <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-              <thead><tr><th>Customer</th><th class="text-end">Amount</th><th>Days</th></tr></thead>
-              <tbody>
-                <tr><td>MedCity Hospital</td><td class="text-end text-danger">₨ 1,25,000</td><td><span class="badge bg-danger">60+ days</span></td></tr>
-                <tr><td>Kamran Brothers</td><td class="text-end text-danger">₨ 45,000</td><td><span class="badge bg-danger">45 days</span></td></tr>
-                <tr><td>Ali Hassan</td><td class="text-end text-danger">₨ 4,500</td><td><span class="badge bg-warning">30 days</span></td></tr>
-                <tr><td>Ahmed Khan</td><td class="text-end text-danger">₨ 2,500</td><td><span class="badge bg-info">15 days</span></td></tr>
-              </tbody>
-              <tfoot><tr class="table-light"><td><strong>Total</strong></td><td class="text-end text-danger"><strong>₨ 1,77,000</strong></td><td></td></tr></tfoot>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header"><h6 class="mb-0">Accounts Payable</h6></div>
-          <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-              <thead><tr><th>Supplier</th><th class="text-end">Amount</th><th>Days</th></tr></thead>
-              <tbody>
-                <tr><td>Global Pharma</td><td class="text-end text-danger">₨ 1,25,000</td><td><span class="badge bg-danger">60+ days</span></td></tr>
-                <tr><td>Karachi Pharma</td><td class="text-end text-danger">₨ 85,000</td><td><span class="badge bg-warning">30 days</span></td></tr>
-                <tr><td>Lahore Medical</td><td class="text-end text-danger">₨ 42,000</td><td><span class="badge bg-warning">30 days</span></td></tr>
-                <tr><td>Peshawar Pharma</td><td class="text-end text-danger">₨ 28,000</td><td><span class="badge bg-info">15 days</span></td></tr>
-                <tr><td>Al-Rehman</td><td class="text-end text-danger">₨ 15,000</td><td><span class="badge bg-info">15 days</span></td></tr>
-              </tbody>
-              <tfoot><tr class="table-light"><td><strong>Total</strong></td><td class="text-end text-danger"><strong>₨ 2,95,000</strong></td><td></td></tr></tfoot>
-            </table>
+            ${expensesByCategory.length > 0
+              ? createDonutChart({
+                  labels: expensesByCategory.map((c) => c.category_name),
+                  values: expensesByCategory.map((c) => Number(c.amount || 0)),
+                  colors: expensesByCategory.map((_, i) => expColors[i % expColors.length])
+                })
+              : '<div class="text-center text-muted">No expense data</div>'}
+            ${expensesByCategory.map((c) => `
+              <div class="d-flex justify-content-between mb-2 mt-2">
+                <span>${c.category_name}</span>
+                <span class="fw-semibold">₨ ${Number(c.amount).toLocaleString()}</span>
+              </div>
+            `).join('')}
           </div>
         </div>
       </div>
@@ -729,146 +606,36 @@ function renderFinancialReports(container: HTMLElement): void {
   `;
 }
 
-function renderInventoryReports(container: HTMLElement): void {
+async function renderInventoryReports(container: HTMLElement): Promise<void> {
+  let lowStock: any[] = [];
+  let expiringSoon: any[] = [];
+
+  try {
+    lowStock = await inventoryService.getLowStock();
+    expiringSoon = await inventoryService.getExpiringSoon(90);
+  } catch { /* use defaults */ }
+
   container.innerHTML = `
     <div class="row g-3 mb-4">
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">20</div>
-              <div class="stat-label">Total Medicines</div>
-            </div>
-            <div class="stat-icon blue"><i class="bi bi-box-seam"></i></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="stat-card">
-          <div class="d-flex align-items-center justify-content-between">
-            <div>
-              <div class="stat-value">₨ 11,05,000</div>
-              <div class="stat-label">Stock Value</div>
-            </div>
-            <div class="stat-icon green"><i class="bi bi-cash-stack"></i></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="stat-card">
-          <div class="d-flex align-items-center justify-content-between">
-            <div>
-              <div class="stat-value">3</div>
+              <div class="stat-value">${lowStock.length}</div>
               <div class="stat-label">Low Stock Items</div>
             </div>
             <div class="stat-icon red"><i class="bi bi-exclamation-triangle"></i></div>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="stat-card">
           <div class="d-flex align-items-center justify-content-between">
             <div>
-              <div class="stat-value">2</div>
-              <div class="stat-label">Expiring Soon</div>
+              <div class="stat-value">${expiringSoon.length}</div>
+              <div class="stat-label">Expiring Soon (90 days)</div>
             </div>
             <div class="stat-icon orange"><i class="bi bi-clock-history"></i></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header">
-            <h6 class="mb-0">Stock Value by Category</h6>
-          </div>
-          <div class="card-body">
-            ${createBarChart({
-              labels: ['Pain Relief', 'Antibiotics', 'Antihistamines', 'Gastro', 'Cardiac', 'Others'],
-              values: [280000, 350000, 120000, 210000, 150000, 80000],
-              colors: ['#0d6efd', '#198754', '#ffc107', '#0dcaf0', '#dc3545', '#6c757d']
-            }, 250)}
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Stock Status</h6>
-          </div>
-          <div class="card-body">
-            ${createDonutChart({
-              labels: ['In Stock', 'Low Stock', 'Out of Stock'],
-              values: [15, 3, 0],
-              colors: ['#198754', '#ffc107', '#dc3545']
-            }, 160)}
-            <div class="mt-3">
-              <div class="d-flex justify-content-between mb-2">
-                <span class="text-success"><i class="bi bi-check-circle me-2"></i>In Stock</span>
-                <span class="fw-semibold">15 items (75%)</span>
-              </div>
-              <div class="d-flex justify-content-between mb-2">
-                <span class="text-warning"><i class="bi bi-exclamation-circle me-2"></i>Low Stock</span>
-                <span class="fw-semibold">3 items (15%)</span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span class="text-danger"><i class="bi bi-x-circle me-2"></i>Out of Stock</span>
-                <span class="fw-semibold">0 items (0%)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Monthly Stock Movement</h6>
-          </div>
-          <div class="card-body">
-            ${createLineChart({
-              labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
-              datasets: [
-                { name: 'Stock In', values: [180000, 240000, 200000, 260000, 285000, 220000], color: '#198754' },
-                { name: 'Stock Out', values: [150000, 200000, 180000, 220000, 250000, 195000], color: '#dc3545' },
-              ]
-            }, 220)}
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h6 class="mb-0">Expiry Distribution</h6>
-          </div>
-          <div class="card-body">
-            ${createDonutChart({
-              labels: ['>12 months', '6-12 months', '3-6 months', '<3 months'],
-              values: [8, 6, 4, 2],
-              colors: ['#198754', '#0d6efd', '#ffc107', '#dc3545']
-            }, 160)}
-            <div class="mt-3">
-              <div class="d-flex justify-content-between mb-2">
-                <span class="text-success"><i class="bi bi-check-circle me-2"></i>&gt;12 months</span>
-                <span class="fw-semibold">8 items</span>
-              </div>
-              <div class="d-flex justify-content-between mb-2">
-                <span class="text-primary"><i class="bi bi-clock me-2"></i>6-12 months</span>
-                <span class="fw-semibold">6 items</span>
-              </div>
-              <div class="d-flex justify-content-between mb-2">
-                <span class="text-warning"><i class="bi bi-exclamation-circle me-2"></i>3-6 months</span>
-                <span class="fw-semibold">4 items</span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span class="text-danger"><i class="bi bi-x-circle me-2"></i>&lt;3 months</span>
-                <span class="fw-semibold">2 items</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -880,11 +647,11 @@ function renderInventoryReports(container: HTMLElement): void {
           <div class="card-header"><h6 class="mb-0">Low Stock Alert</h6></div>
           <div class="card-body p-0">
             <table class="table table-hover mb-0">
-              <thead><tr><th>Medicine</th><th class="text-end">Stock</th><th class="text-end">Min Required</th><th>Status</th></tr></thead>
+              <thead><tr><th>Medicine</th><th class="text-end">Current Stock</th><th class="text-end">Min Required</th><th>Status</th></tr></thead>
               <tbody>
-                <tr><td>Cetirizine 10mg</td><td class="text-end">15</td><td class="text-end">50</td><td><span class="badge bg-danger">Critical</span></td></tr>
-                <tr><td>Brufen 400mg</td><td class="text-end">28</td><td class="text-end">50</td><td><span class="badge bg-warning">Low</span></td></tr>
-                <tr><td>Dolo 650</td><td class="text-end">20</td><td class="text-end">40</td><td><span class="badge bg-warning">Low</span></td></tr>
+                ${lowStock.length > 0
+                  ? lowStock.map((m: any) => `<tr><td>${m.name}</td><td class="text-end">${m.total_stock ?? m.quantity ?? 0}</td><td class="text-end">${m.min_stock_level ?? 10}</td><td><span class="badge ${Number(m.total_stock ?? m.quantity ?? 0) === 0 ? 'bg-danger' : 'bg-warning'}">${Number(m.total_stock ?? m.quantity ?? 0) === 0 ? 'Out of Stock' : 'Low'}</span></td></tr>`).join('')
+                  : '<tr><td colspan="4" class="text-center text-muted">All items in stock</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -892,13 +659,17 @@ function renderInventoryReports(container: HTMLElement): void {
       </div>
       <div class="col-md-6">
         <div class="card h-100">
-          <div class="card-header"><h6 class="mb-0">Expiring Soon (30 days)</h6></div>
+          <div class="card-header"><h6 class="mb-0">Expiring Soon (90 days)</h6></div>
           <div class="card-body p-0">
             <table class="table table-hover mb-0">
               <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="text-end">Stock</th></tr></thead>
               <tbody>
-                <tr><td>Amoxicillin 500mg</td><td><code>A001</code></td><td>2026-10-15</td><td class="text-end">150</td></tr>
-                <tr><td>Cetirizine 10mg</td><td><code>C001</code></td><td>2026-10-20</td><td class="text-end">15</td></tr>
+                ${expiringSoon.length > 0
+                  ? expiringSoon.map((m: any) => {
+                      const days = Math.ceil((new Date(m.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      return `<tr><td>${m.medicine_name || m.name}</td><td><code>${m.batch_number || '-'}</code></td><td>${new Date(m.expiry_date).toLocaleDateString()} <span class="badge bg-warning ms-1">${days}d</span></td><td class="text-end">${m.quantity ?? m.stock ?? 0}</td></tr>`;
+                    }).join('')
+                  : '<tr><td colspan="4" class="text-center text-muted">No items expiring soon</td></tr>'}
               </tbody>
             </table>
           </div>

@@ -138,6 +138,7 @@ export class SaleRepository {
 
     try {
       const invoiceNumber = await this.getNextInvoiceNumber();
+      const paymentNumber = await this.getNextPaymentNumber();
 
       const subtotal = data.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
       const discount = data.discount || 0;
@@ -165,6 +166,22 @@ export class SaleRepository {
       );
 
       const saleId = saleResult.insertId;
+
+      if (data.customer_id) {
+        await execute(
+          `INSERT INTO payments (payment_number, payment_type, entity_type, entity_id, amount, payment_method, reference_type, reference_id, user_id, notes)
+           VALUES (?, 'receivable', 'customer', ?, ?, ?, 'sale', ?, ?, ?)`,
+          [
+            paymentNumber,
+            data.customer_id,
+            total,
+            data.payment_method,
+            saleId,
+            userId,
+            `Payment for ${invoiceNumber}`,
+          ]
+        );
+      }
 
       for (const item of data.items) {
         const itemTotal = item.unit_price * item.quantity - (item.discount || 0);
@@ -223,18 +240,35 @@ export class SaleRepository {
   }
 
   async getNextInvoiceNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `INV-${year}-`;
     const last = await queryOne<{ invoice_number: string }>(
-      "SELECT invoice_number FROM sales ORDER BY id DESC LIMIT 1"
+      "SELECT invoice_number FROM sales WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1",
+      [`${prefix}%`]
     );
 
     if (!last) {
-      return 'INV-2026-000001';
+      return `${prefix}000001`;
     }
 
-    const parts = last.invoice_number.split('-');
-    const year = parts[1];
-    const seq = parseInt(parts[2]) + 1;
-    return `INV-${year}-${String(seq).padStart(6, '0')}`;
+    const seq = parseInt(last.invoice_number.split('-')[2]) + 1;
+    return `${prefix}${String(seq).padStart(6, '0')}`;
+  }
+
+  async getNextPaymentNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `PAY-SALE-${year}-`;
+    const last = await queryOne<{ payment_number: string }>(
+      "SELECT payment_number FROM payments WHERE payment_number LIKE ? ORDER BY id DESC LIMIT 1",
+      [`${prefix}%`]
+    );
+
+    if (!last) {
+      return `${prefix}000001`;
+    }
+
+    const seq = parseInt(last.payment_number.split('-')[3]) + 1;
+    return `${prefix}${String(seq).padStart(6, '0')}`;
   }
 
   async getDailySales(date: Date): Promise<{ total_sales: number; total_amount: number }> {

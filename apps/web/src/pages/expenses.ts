@@ -1,5 +1,6 @@
 import { createBarChart, createDonutChart } from '../utils/charts';
 import { expenseService, Expense as ApiExpense, ExpenseCategory as ApiExpenseCategory } from '../services/expense.service';
+import { confirmDelete, successToast, errorToast } from '../utils/alerts';
 
 interface Expense {
   id: number;
@@ -217,6 +218,12 @@ function renderExpensesList(container: HTMLElement): void {
     <div class="card mb-4">
       <div class="card-body">
         <div class="row g-3">
+          <div class="col-md-3">
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" id="searchExpense" placeholder="Search expenses...">
+            </div>
+          </div>
           <div class="col-md-2">
             <select class="form-select" id="filterCategory">
               <option value="">All Categories</option>
@@ -305,7 +312,8 @@ function renderTable(): void {
   const filtered = expenses.filter((e) => {
     const matchSearch = !search || 
       e.description.toLowerCase().includes(search) || 
-      e.vendor.toLowerCase().includes(search);
+      e.vendor.toLowerCase().includes(search) ||
+      e.reference.toLowerCase().includes(search);
     const matchCategory = !category || e.category === category;
     const matchPayment = !payment || e.payment_method === payment;
     
@@ -529,8 +537,9 @@ function showExpenseModal(editId?: number): void {
       }
       modal.remove();
       await loadExpenses();
+      successToast('Expense saved successfully!');
     } catch {
-      alert('Failed to save expense. Please try again.');
+      errorToast('Failed to save expense.');
     }
   });
 }
@@ -636,12 +645,13 @@ async function deleteExpense(id: number): Promise<void> {
   const expense = expenses.find((e) => e.id === id);
   if (!expense) return;
 
-  if (confirm(`Are you sure you want to delete this expense?\n\n"${expense.description}"\nAmount: ₨ ${expense.amount.toLocaleString()}`)) {
+  if (await confirmDelete('expense')) {
     try {
       await expenseService.delete(id);
       await loadExpenses();
+      successToast('Expense deleted successfully!');
     } catch {
-      alert('Failed to delete expense. Please try again.');
+      errorToast('Failed to delete expense.');
     }
   }
 }

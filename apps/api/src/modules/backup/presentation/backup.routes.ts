@@ -7,9 +7,11 @@ import {
 } from './backup.controller.js';
 import { authenticate, authorize } from '../../../infrastructure/middleware/auth.middleware.js';
 import { getPool } from '../../../infrastructure/database/connection.js';
+import { BackupService } from '../application/backup.service.js';
 import { Request, Response } from 'express';
 
 const router = Router();
+const backupService = new BackupService();
 
 router.get('/settings', authenticate, async (req: Request, res: Response) => {
   try {
@@ -47,16 +49,17 @@ router.delete('/:id', authenticate, authorize('backup.delete'), deleteBackup);
 
 router.get('/:id/download', authenticate, authorize('backup.view'), async (req: Request, res: Response) => {
   try {
-    const pool = await getPool();
     const { id } = req.params;
-    const [backup] = await pool.query('SELECT * FROM backups WHERE id = ?', [id]) as any[];
-    if (!(backup as any[]).length) {
-      res.status(404).json({ status: 'error', message: 'Backup not found' });
+    const jsonData = await backupService.downloadBackup(Number(id));
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; backup-${id}.json`);
+    res.send(jsonData);
+  } catch (error: any) {
+    console.error('Download backup error:', error);
+    if (error.message === 'Backup not found') {
+      res.status(404).json({ status: 'error', message: error.message });
       return;
     }
-    res.json({ status: 'success', data: (backup as any[])[0], message: 'Download initiated' });
-  } catch (error) {
-    console.error('Download backup error:', error);
     res.status(500).json({ status: 'error', message: 'Download failed' });
   }
 });

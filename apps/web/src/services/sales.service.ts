@@ -35,6 +35,21 @@ export interface SaleWithItems extends Sale {
   user_name?: string;
 }
 
+export interface SaleReturn {
+  id: number;
+  return_number: string;
+  sale_id: number;
+  customer_id: number | null;
+  user_id: number;
+  subtotal: number;
+  total_amount: number;
+  refund_method: string;
+  reason: string | null;
+  status: string;
+  user_name?: string;
+  created_at: string;
+}
+
 export interface CreateSaleDTO {
   customer_id?: number | null;
   items: {
@@ -85,6 +100,22 @@ class SalesService {
     const response = await api.get<{ status: string; data: any }>(
       `/transactions/sales/summary?start=${startDate}&end=${endDate}`
     );
+    return response.data.data;
+  }
+
+  async getReturns(limit = 50, offset = 0): Promise<{ data: SaleReturn[]; total: number }> {
+    const response = await api.get(`/transactions/sales/returns?limit=${limit}&offset=${offset}`);
+    return { data: response.data.data, total: response.data.total };
+  }
+
+  async createReturn(data: {
+    sale_id: number;
+    customer_id?: number | null;
+    items: { sale_item_id: number; medicine_id: number; quantity: number; unit_price: number }[];
+    refund_method: 'cash' | 'card' | 'credit';
+    reason?: string;
+  }): Promise<any> {
+    const response = await api.post('/transactions/sales/returns', data);
     return response.data.data;
   }
 }

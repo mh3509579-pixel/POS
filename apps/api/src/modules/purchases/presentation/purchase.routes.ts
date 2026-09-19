@@ -7,6 +7,12 @@ import {
   getDailyPurchases,
   getPurchasesSummary,
 } from './purchase.controller.js';
+import {
+  createPurchaseReturn,
+  getAllPurchaseReturns,
+  getPurchaseReturnById,
+  getPurchaseReturnsByPurchaseId,
+} from './purchase-return.controller.js';
 import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
 import { getPool } from '../../../infrastructure/database/connection.js';
 import { Request, Response } from 'express';
@@ -19,6 +25,12 @@ router.post('/purchases', createPurchase);
 router.get('/purchases', getAllPurchases);
 router.get('/purchases/daily', getDailyPurchases);
 router.get('/purchases/summary', getPurchasesSummary);
+
+router.post('/purchases/returns', createPurchaseReturn);
+router.get('/purchases/returns', getAllPurchaseReturns);
+router.get('/purchases/returns/purchase/:purchaseId', getPurchaseReturnsByPurchaseId);
+router.get('/purchases/returns/:id', getPurchaseReturnById);
+
 router.get('/purchases/:id', getPurchaseById);
 router.get('/purchases/number/:purchaseNumber', getPurchaseByNumber);
 

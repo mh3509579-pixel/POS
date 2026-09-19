@@ -47,6 +47,10 @@ export class BackupRepository {
     await execute(`UPDATE backups SET ${fields.join(', ')} WHERE id = ?`, values);
   }
 
+  async updateNotes(id: number, notes: string): Promise<void> {
+    await execute('UPDATE backups SET notes = ? WHERE id = ?', [notes, id]);
+  }
+
   async delete(id: number): Promise<boolean> {
     const result = await execute('DELETE FROM backups WHERE id = ?', [id]);
     return result.affectedRows > 0;

@@ -1,5 +1,6 @@
 import { createLineChart, createDonutChart } from '../utils/charts';
-import { salesService, Sale as ApiSale } from '../services/sales.service';
+import { salesService, Sale as ApiSale, SaleWithItems, SaleReturn } from '../services/sales.service';
+import { confirmAction, successToast, errorToast } from '../utils/alerts';
 
 type SalesTab = 'list' | 'returns';
 
@@ -603,9 +604,19 @@ function printInvoice(id: number): void {
   printWindow.document.close();
 }
 
-function initiateReturn(saleId: number): void {
-  const sale = salesData.find((s) => s.id === saleId);
-  if (!sale) return;
+async function initiateReturn(saleId: number): Promise<void> {
+  let saleDetail: SaleWithItems;
+  try {
+    saleDetail = await salesService.getById(saleId);
+  } catch {
+    errorToast('Failed to load sale details');
+    return;
+  }
+
+  if (!saleDetail.items || saleDetail.items.length === 0) {
+    errorToast('No items found for this sale to return');
+    return;
+  }
 
   const modal = document.createElement('div');
   modal.className = 'modal show';
@@ -613,7 +624,7 @@ function initiateReturn(saleId: number): void {
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Return Items - ${sale.invoice_number}</h5>
+          <h5 class="modal-title">Return Items - ${saleDetail.invoice_number || 'Sale #' + saleDetail.id}</h5>
           <button type="button" class="btn-close modal-close-btn"></button>
         </div>
         <div class="modal-body">
@@ -628,25 +639,23 @@ function initiateReturn(saleId: number): void {
                 <tr>
                   <th>Select</th>
                   <th>Medicine</th>
-                  <th>Batch</th>
                   <th class="text-end">Purchased Qty</th>
                   <th class="text-end">Return Qty</th>
                   <th class="text-end">Refund</th>
                 </tr>
               </thead>
               <tbody>
-                ${sale.items.map((item) => `
+                ${saleDetail.items.map((item) => `
                   <tr>
                     <td>
-                      <input type="checkbox" class="form-check-input return-check" data-id="${item.medicine_id}" data-price="${item.unit_price}">
+                      <input type="checkbox" class="form-check-input return-check" data-sale-item-id="${item.id}" data-medicine-id="${item.medicine_id}" data-price="${item.unit_price}">
                     </td>
-                    <td>${item.medicine_name}</td>
-                    <td><code>${item.batch}</code></td>
+                    <td>${item.medicine_id}</td>
                     <td class="text-end">${item.quantity}</td>
                     <td>
-                      <input type="number" class="form-control form-control-sm return-qty" data-id="${item.medicine_id}" min="1" max="${item.quantity}" value="1" disabled style="width: 70px;">
+                      <input type="number" class="form-control form-control-sm return-qty" data-sale-item-id="${item.id}" min="1" max="${item.quantity}" value="1" disabled style="width: 70px;">
                     </td>
-                    <td class="text-end refund-amount" data-id="${item.medicine_id}">₨ 0</td>
+                    <td class="text-end refund-amount" data-sale-item-id="${item.id}">₨ 0</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -664,17 +673,27 @@ function initiateReturn(saleId: number): void {
             </div>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label">Return Reason</label>
-            <select class="form-select" id="returnReason">
-              <option value="">Select Reason</option>
-              <option value="wrong_item">Wrong Item</option>
-              <option value="side_effects">Side Effects</option>
-              <option value="not_needed">Not Needed</option>
-              <option value="expired">Expired Product</option>
-              <option value="damaged">Damaged Package</option>
-              <option value="other">Other</option>
-            </select>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Return Reason</label>
+              <select class="form-select" id="returnReason">
+                <option value="">Select Reason</option>
+                <option value="wrong_item">Wrong Item</option>
+                <option value="side_effects">Side Effects</option>
+                <option value="not_needed">Not Needed</option>
+                <option value="expired">Expired Product</option>
+                <option value="damaged">Damaged Package</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Refund Method</label>
+              <select class="form-select" id="refundMethod">
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="credit">Credit</option>
+              </select>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -693,8 +712,8 @@ function initiateReturn(saleId: number): void {
   modal.querySelectorAll('.return-check').forEach((checkEl) => {
     const check = checkEl as HTMLInputElement;
     check.addEventListener('change', () => {
-      const id = check.getAttribute('data-id');
-      const qtyInput = modal.querySelector(`.return-qty[data-id="${id}"]`) as HTMLInputElement;
+      const saleItemId = check.getAttribute('data-sale-item-id');
+      const qtyInput = modal.querySelector(`.return-qty[data-sale-item-id="${saleItemId}"]`) as HTMLInputElement;
       if (qtyInput) {
         qtyInput.disabled = !check.checked;
         if (!check.checked) qtyInput.value = '1';
@@ -715,13 +734,13 @@ function initiateReturn(saleId: number): void {
     modal.querySelectorAll('.return-check').forEach((checkEl) => {
       const check = checkEl as HTMLInputElement;
       if (check.checked) {
-        const id = check.getAttribute('data-id');
+        const saleItemId = check.getAttribute('data-sale-item-id');
         const price = parseFloat(check.getAttribute('data-price') || '0');
-        const qtyInput = modal.querySelector(`.return-qty[data-id="${id}"]`) as HTMLInputElement;
+        const qtyInput = modal.querySelector(`.return-qty[data-sale-item-id="${saleItemId}"]`) as HTMLInputElement;
         const qty = parseInt(qtyInput?.value || '0');
         const refund = price * qty;
         totalRefund += refund;
-        const refundEl = modal.querySelector(`.refund-amount[data-id="${id}"]`);
+        const refundEl = modal.querySelector(`.refund-amount[data-sale-item-id="${saleItemId}"]`);
         if (refundEl) refundEl.textContent = `₨ ${refund.toFixed(2)}`;
       }
     });
@@ -736,43 +755,65 @@ function initiateReturn(saleId: number): void {
     if (e.target === modal) modal.remove();
   });
 
-  modal.querySelector('#processReturnBtn')?.addEventListener('click', () => {
+  modal.querySelector('#processReturnBtn')?.addEventListener('click', async () => {
     const reason = (modal.querySelector('#returnReason') as HTMLSelectElement).value;
     if (!reason) {
-      alert('Please select a return reason');
+      errorToast('Please select a return reason');
       return;
     }
 
-    let hasItems = false;
+    const refundMethod = (modal.querySelector('#refundMethod') as HTMLSelectElement).value as 'cash' | 'card' | 'credit';
+
+    const items: { sale_item_id: number; medicine_id: number; quantity: number; unit_price: number }[] = [];
     modal.querySelectorAll('.return-check').forEach((checkEl) => {
       const check = checkEl as HTMLInputElement;
-      if (check.checked) hasItems = true;
+      if (check.checked) {
+        const saleItemId = parseInt(check.getAttribute('data-sale-item-id') || '0');
+        const medicineId = parseInt(check.getAttribute('data-medicine-id') || '0');
+        const price = parseFloat(check.getAttribute('data-price') || '0');
+        const qtyInput = modal.querySelector(`.return-qty[data-sale-item-id="${saleItemId}"]`) as HTMLInputElement;
+        const qty = parseInt(qtyInput?.value || '0');
+        items.push({ sale_item_id: saleItemId, medicine_id: medicineId, quantity: qty, unit_price: price });
+      }
     });
 
-    if (!hasItems) {
-      alert('Please select at least one item to return');
+    if (items.length === 0) {
+      errorToast('Please select at least one item to return');
       return;
     }
 
-    if (confirm('Are you sure you want to process this return?')) {
-      // Process return logic here
-      alert('Return processed successfully! Stock has been restored.');
+    if (!(await confirmAction('Process Return?', 'Stock will be restored and a refund will be issued.'))) return;
+
+    const btn = modal.querySelector('#processReturnBtn') as HTMLButtonElement;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...'; }
+
+    try {
+      await salesService.createReturn({
+        sale_id: saleDetail.id,
+        customer_id: saleDetail.customer_id,
+        items,
+        refund_method: refundMethod,
+        reason,
+      });
+      successToast('Return processed successfully!');
       modal.remove();
+      if (currentTab === 'returns') {
+        const content = document.getElementById('salesContent');
+        if (content) renderSalesReturns(content);
+      }
+    } catch (err: any) {
+      errorToast(err?.response?.data?.message || 'Failed to process return');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-return-left me-2"></i>Process Return'; }
     }
   });
 }
 
-function renderSalesReturns(container: HTMLElement): void {
-  const returns = [
-    { id: 1, date: '2026-09-12', invoice: 'INV-2026-000001', customer: 'Ahmed Khan', items: 1, total: 50, reason: 'Side Effects', status: 'completed' },
-    { id: 2, date: '2026-09-11', invoice: 'INV-2026-000003', customer: 'Fatima Shah', items: 2, total: 170, reason: 'Wrong Item', status: 'pending' },
-  ];
-
+async function renderSalesReturns(container: HTMLElement): Promise<void> {
   container.innerHTML = `
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Sales Returns</h6>
-        <span class="text-muted">${returns.length} returns</span>
+        <span class="text-muted" id="returnCount">Loading...</span>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -781,44 +822,83 @@ function renderSalesReturns(container: HTMLElement): void {
               <tr>
                 <th>Return #</th>
                 <th>Date</th>
-                <th>Original Invoice</th>
+                <th>Sale ID</th>
                 <th>Customer</th>
-                <th>Items</th>
+                <th>Refund Method</th>
                 <th>Refund Amount</th>
                 <th>Reason</th>
                 <th>Status</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              ${returns.length === 0 ? `
-                <tr>
-                  <td colspan="9" class="text-center py-5">
-                    <div class="text-muted">
-                      <i class="bi bi-arrow-return-left fs-1 d-block mb-2"></i>
-                      <h6>No sales returns</h6>
-                    </div>
-                  </td>
-                </tr>
-              ` : returns.map((r) => `
-                <tr>
-                  <td><code>SR-2026-${String(r.id).padStart(4, '0')}</code></td>
-                  <td>${new Date(r.date).toLocaleDateString()}</td>
-                  <td><code>${r.invoice}</code></td>
-                  <td>${r.customer}</td>
-                  <td>${r.items} item(s)</td>
-                  <td class="fw-semibold text-danger">₨ ${r.total.toLocaleString()}</td>
-                  <td>${r.reason}</td>
-                  <td><span class="badge-status ${r.status === 'completed' ? 'badge-success' : 'badge-warning'} text-capitalize">${r.status}</span></td>
-                  <td class="text-end">
-                    <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></button>
-                  </td>
-                </tr>
-              `).join('')}
+            <tbody id="returnsTableBody">
+              <tr>
+                <td colspan="9" class="text-center py-5">
+                  <div class="text-muted">
+                    <i class="bi bi-arrow-return-left fs-1 d-block mb-2"></i>
+                    <h6>Loading returns...</h6>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
   `;
+
+  try {
+    const { data: returns, total } = await salesService.getReturns();
+    const countEl = document.getElementById('returnCount');
+    if (countEl) countEl.textContent = `${total} returns`;
+
+    const tbody = document.getElementById('returnsTableBody');
+    if (!tbody) return;
+
+    if (returns.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center py-5">
+            <div class="text-muted">
+              <i class="bi bi-arrow-return-left fs-1 d-block mb-2"></i>
+              <h6>No sales returns</h6>
+            </div>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = returns.map((r) => `
+      <tr>
+        <td><code>${r.return_number}</code></td>
+        <td>${new Date(r.created_at).toLocaleDateString()}</td>
+        <td><code>${r.sale_id}</code></td>
+        <td>${r.user_name || 'N/A'}</td>
+        <td><span class="badge-status badge-info text-capitalize">${r.refund_method}</span></td>
+        <td class="fw-semibold text-danger">₨ ${r.total_amount.toLocaleString()}</td>
+        <td>${r.reason || '-'}</td>
+        <td><span class="badge-status ${r.status === 'completed' ? 'badge-success' : 'badge-warning'} text-capitalize">${r.status}</span></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-secondary view-return-btn" data-id="${r.id}" title="View Details">
+            <i class="bi bi-eye"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  } catch {
+    const tbody = document.getElementById('returnsTableBody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center py-5">
+            <div class="text-muted">
+              <i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i>
+              <h6>Failed to load returns</h6>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  }
 }

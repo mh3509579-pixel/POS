@@ -1,6 +1,6 @@
 import { CreateBackupDTO, BackupRecord } from '../domain/backup.entity.js';
 import { BackupRepository } from '../infrastructure/backup.repository.js';
-import { query } from '../../../infrastructure/database/connection.js';
+import { query, getPool } from '../../../infrastructure/database/connection.js';
 
 export class BackupService {
   private backupRepo: BackupRepository;
@@ -22,22 +22,23 @@ export class BackupService {
             'sale_returns', 'sale_return_items', 'purchase_returns', 'purchase_return_items',
             'stock_movements', 'expenses', 'expense_categories',
             'accounts', 'journal_entries', 'journal_entry_lines', 'general_ledger',
-            'audit_logs', 'settings',
+            'audit_logs', 'settings', 'payments',
           ]
         : ['medicines', 'medicine_batches', 'stock_movements'];
 
-      let totalRows = 0;
+      const backupData: Record<string, any[]> = {};
       for (const table of tables) {
         try {
-          const result = await query(`SELECT COUNT(*) as count FROM ${table}`);
-          totalRows += (result as any)[0]?.count || 0;
+          const rows = await query<any[]>(`SELECT * FROM ${table}`);
+          backupData[table] = rows;
         } catch {
           // Table might not exist
         }
       }
 
-      const estimatedSize = totalRows * 500;
-      await this.backupRepo.updateStatus(backup.id, 'completed', `/backups/${backup.backup_number}.sql`, estimatedSize);
+      const jsonData = JSON.stringify(backupData);
+      await this.backupRepo.updateStatus(backup.id, 'completed', undefined, jsonData.length);
+      await this.backupRepo.updateNotes(backup.id, jsonData);
 
       return this.backupRepo.findById(backup.id) as Promise<BackupRecord>;
     } catch (error) {
@@ -62,11 +63,56 @@ export class BackupService {
     if (backup.status !== 'completed') {
       throw new Error('Backup is not completed');
     }
+    if (!backup.notes) {
+      throw new Error('Backup contains no data');
+    }
 
-    console.log(`[Backup] Restoring from backup: ${backup.backup_number}`);
+    const backupData = JSON.parse(backup.notes) as Record<string, any[]>;
+    const pool = await getPool();
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      for (const [table, rows] of Object.entries(backupData)) {
+        await connection.query(`TRUNCATE TABLE ${table}`);
+
+        if (rows.length === 0) continue;
+
+        const columns = Object.keys(rows[0]);
+        const placeholders = columns.map(() => '?').join(', ');
+        const insertSql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
+
+        for (const row of rows) {
+          const values = columns.map((col) => row[col]);
+          await connection.query(insertSql, values);
+        }
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   async deleteBackup(id: number): Promise<boolean> {
     return this.backupRepo.delete(id);
+  }
+
+  async downloadBackup(id: number): Promise<string> {
+    const backup = await this.backupRepo.findById(id);
+    if (!backup) {
+      throw new Error('Backup not found');
+    }
+    if (backup.status !== 'completed') {
+      throw new Error('Backup is not completed');
+    }
+    if (!backup.notes) {
+      throw new Error('Backup contains no data');
+    }
+    return backup.notes;
   }
 }

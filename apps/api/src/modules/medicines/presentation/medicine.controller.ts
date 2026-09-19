@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { MedicineRepository } from '../infrastructure/medicine.repository.js';
+import { logAudit } from '../../../infrastructure/utils/audit-logger.js';
 
 const medicineRepo = new MedicineRepository();
 
@@ -54,6 +55,15 @@ export async function createMedicine(req: Request, res: Response, next: NextFunc
     }
 
     const medicine = await medicineRepo.create(req.body);
+    await logAudit({
+      user_id: (req as any).user?.userId,
+      action: 'create',
+      entity_type: 'medicine',
+      entity_id: medicine.id,
+      new_values: req.body,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    });
     res.status(201).json({ status: 'success', data: medicine });
   } catch (error) {
     next(error);
@@ -62,11 +72,22 @@ export async function createMedicine(req: Request, res: Response, next: NextFunc
 
 export async function updateMedicine(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const existingMedicine = await medicineRepo.findById(parseInt(req.params.id));
     const medicine = await medicineRepo.update(parseInt(req.params.id), req.body);
     if (!medicine) {
       res.status(404).json({ status: 'error', message: 'Medicine not found' });
       return;
     }
+    await logAudit({
+      user_id: (req as any).user?.userId,
+      action: 'update',
+      entity_type: 'medicine',
+      entity_id: medicine.id,
+      old_values: existingMedicine,
+      new_values: req.body,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    });
     res.json({ status: 'success', data: medicine });
   } catch (error) {
     next(error);
@@ -75,11 +96,21 @@ export async function updateMedicine(req: Request, res: Response, next: NextFunc
 
 export async function deleteMedicine(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const medicineToDelete = await medicineRepo.findById(parseInt(req.params.id));
     const success = await medicineRepo.delete(parseInt(req.params.id));
     if (!success) {
       res.status(404).json({ status: 'error', message: 'Medicine not found' });
       return;
     }
+    await logAudit({
+      user_id: (req as any).user?.userId,
+      action: 'delete',
+      entity_type: 'medicine',
+      entity_id: parseInt(req.params.id),
+      old_values: medicineToDelete,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    });
     res.json({ status: 'success', message: 'Medicine deleted' });
   } catch (error) {
     next(error);

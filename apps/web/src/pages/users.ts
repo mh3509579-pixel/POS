@@ -1,4 +1,5 @@
 import { authService, User as ApiUser } from '../services/auth.service';
+import { confirmAction, successToast, errorToast } from '../utils/alerts';
 
 interface User {
   id: number;
@@ -172,9 +173,10 @@ export function renderUsers(): string {
   `;
 }
 
-export function initUsers(): void {
+export async function initUsers(): Promise<void> {
+  await loadRoles();
+  populateRoleFilter();
   loadUsers();
-  loadRoles();
 
   document.getElementById('searchUser')?.addEventListener('input', renderTable);
   document.getElementById('filterRole')?.addEventListener('change', renderTable);
@@ -187,6 +189,14 @@ export function initUsers(): void {
   });
 
   document.getElementById('addUserBtn')?.addEventListener('click', () => showUserModal());
+}
+
+function populateRoleFilter(): void {
+  const roleFilter = document.getElementById('filterRole') as HTMLSelectElement;
+  if (roleFilter && roles.length > 0) {
+    roleFilter.innerHTML = `<option value="">All Roles</option>` +
+      roles.map((r) => `<option value="${r.name}">${r.label}</option>`).join('');
+  }
 }
 
 async function loadRoles(): Promise<void> {
@@ -317,12 +327,13 @@ function renderTable(): void {
       const user = users.find((u) => u.id === id);
       if (user) {
         const newActive = user.status !== 'active';
-        if (confirm(`${newActive ? 'Activate' : 'Deactivate'} user "${user.name}"?`)) {
+        if (await confirmAction('Toggle User Status?', 'Are you sure you want to change this user status.')) {
           try {
             await authService.updateUser(id, { is_active: newActive });
             await loadUsers();
+            successToast('User status updated!');
           } catch {
-            alert('Failed to update user status');
+            errorToast('Failed to update user status.');
           }
         }
       }
@@ -433,8 +444,9 @@ function showUserModal(editId?: number): void {
       }
       await loadUsers();
       modal.remove();
+      successToast('User saved successfully!');
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to save user');
+      errorToast(err?.response?.data?.message || 'Failed to save user');
     }
   });
 }

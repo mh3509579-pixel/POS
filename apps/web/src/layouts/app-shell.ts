@@ -1,4 +1,5 @@
 import { authService } from '../services/auth.service';
+import { notificationService } from '../services/notification.service';
 
 function hasPermission(page: string, role: string): boolean {
   const rolePermissions: Record<string, string[]> = {
@@ -103,10 +104,19 @@ export function renderAppShell(): string {
             </nav>
           </div>
           <div class="topbar-right">
-            <button class="icon-btn" title="Notifications">
-              <i class="bi bi-bell"></i>
-              <span class="badge"></span>
-            </button>
+            <div class="notification-wrapper" style="position:relative">
+              <button class="icon-btn" title="Notifications" id="notificationBtn">
+                <i class="bi bi-bell"></i>
+                <span class="badge" id="notificationBadge" style="display:none">0</span>
+              </button>
+              <div class="notification-dropdown" id="notificationDropdown" style="display:none;position:absolute;right:0;top:100%;width:360px;max-height:480px;overflow-y:auto;background:#fff;border:1px solid #dee2e6;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:1050;">
+                <div style="padding:12px 16px;border-bottom:1px solid #dee2e6;display:flex;justify-content:space-between;align-items:center">
+                  <strong>Notifications</strong>
+                  <button class="btn btn-sm btn-link text-decoration-none p-0" id="markAllReadBtn">Mark all read</button>
+                </div>
+                <div id="notificationList"></div>
+              </div>
+            </div>
             <button class="icon-btn" title="Settings">
               <i class="bi bi-gear"></i>
             </button>
@@ -119,5 +129,67 @@ export function renderAppShell(): string {
         </div>
       </main>
     </div>
+
+    <script type="module">
+      import { notificationService } from '../services/notification.service';
+
+      const badge = document.getElementById('notificationBadge');
+      const btn = document.getElementById('notificationBtn');
+      const dropdown = document.getElementById('notificationDropdown');
+      const list = document.getElementById('notificationList');
+      const markAllBtn = document.getElementById('markAllReadBtn');
+
+      async function loadNotifications() {
+        try {
+          const { data, unread_count } = await notificationService.getAll(20, 0);
+          if (unread_count > 0) {
+            badge.style.display = '';
+            badge.textContent = unread_count > 99 ? '99+' : unread_count;
+          } else {
+            badge.style.display = 'none';
+          }
+          list.innerHTML = data.length === 0
+            ? '<div class="text-center text-muted p-3">No notifications</div>'
+            : data.map(n => \`
+              <div class="notification-item" data-id="\${n.id}" style="padding:10px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer;\${n.is_read ? '' : 'background:#f0f7ff;'}">
+                <div style="display:flex;justify-content:space-between;align-items:start">
+                  <div>
+                    <div style="font-weight:\${n.is_read ? '400' : '600'};font-size:14px">\${n.title}</div>
+                    <div style="font-size:12px;color:#666;margin-top:2px">\${n.message}</div>
+                  </div>
+                  <small class="text-muted" style="white-space:nowrap;margin-left:8px;font-size:11px">\${new Date(n.created_at).toLocaleString()}</small>
+                </div>
+              </div>
+            \`).join('');
+
+          list.querySelectorAll('.notification-item').forEach(el => {
+            el.addEventListener('click', async () => {
+              const id = Number(el.dataset.id);
+              await notificationService.markAsRead(id);
+              el.style.background = '';
+              loadNotifications();
+            });
+          });
+        } catch (e) {
+          console.error('Failed to load notifications', e);
+        }
+      }
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+      });
+
+      document.addEventListener('click', () => { dropdown.style.display = 'none'; });
+      dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+      markAllBtn.addEventListener('click', async () => {
+        await notificationService.markAllAsRead();
+        loadNotifications();
+      });
+
+      loadNotifications();
+      setInterval(loadNotifications, 60000);
+    </script>
   `;
 }

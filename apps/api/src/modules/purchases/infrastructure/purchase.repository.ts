@@ -144,6 +144,7 @@ export class PurchaseRepository {
 
     try {
       const purchaseNumber = await this.getNextPurchaseNumber();
+      const paymentNumber = await this.getNextPaymentNumber();
 
       const subtotal = data.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
       const discount = data.discount || 0;
@@ -169,6 +170,22 @@ export class PurchaseRepository {
       );
 
       const purchaseId = purchaseResult.insertId;
+
+      if (data.supplier_id) {
+        await execute(
+          `INSERT INTO payments (payment_number, payment_type, entity_type, entity_id, amount, payment_method, reference_type, reference_id, user_id, notes)
+           VALUES (?, 'payable', 'supplier', ?, ?, ?, 'purchase', ?, ?, ?)`,
+          [
+            paymentNumber,
+            data.supplier_id,
+            total,
+            'bank_transfer',
+            purchaseId,
+            userId,
+            `Payment for ${purchaseNumber}`,
+          ]
+        );
+      }
 
       for (const item of data.items) {
         const itemTotal = item.unit_price * item.quantity;
@@ -211,7 +228,7 @@ export class PurchaseRepository {
       }
 
       await execute(
-        'UPDATE suppliers SET balance = balance + ? WHERE id = ?',
+        'UPDATE suppliers SET current_balance = current_balance + ? WHERE id = ?',
         [total, data.supplier_id]
       );
 
@@ -225,18 +242,35 @@ export class PurchaseRepository {
   }
 
   async getNextPurchaseNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `PO-${year}-`;
     const last = await queryOne<{ purchase_number: string }>(
-      "SELECT purchase_number FROM purchases ORDER BY id DESC LIMIT 1"
+      "SELECT purchase_number FROM purchases WHERE purchase_number LIKE ? ORDER BY id DESC LIMIT 1",
+      [`${prefix}%`]
     );
 
     if (!last) {
-      return 'PO-2026-000001';
+      return `${prefix}000001`;
     }
 
-    const parts = last.purchase_number.split('-');
-    const year = parts[1];
-    const seq = parseInt(parts[2]) + 1;
-    return `PO-${year}-${String(seq).padStart(6, '0')}`;
+    const seq = parseInt(last.purchase_number.split('-')[2]) + 1;
+    return `${prefix}${String(seq).padStart(6, '0')}`;
+  }
+
+  async getNextPaymentNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `PAY-PO-${year}-`;
+    const last = await queryOne<{ payment_number: string }>(
+      "SELECT payment_number FROM payments WHERE payment_number LIKE ? ORDER BY id DESC LIMIT 1",
+      [`${prefix}%`]
+    );
+
+    if (!last) {
+      return `${prefix}000001`;
+    }
+
+    const seq = parseInt(last.payment_number.split('-')[3]) + 1;
+    return `${prefix}${String(seq).padStart(6, '0')}`;
   }
 
   async getDailyPurchases(date: Date): Promise<{ total_purchases: number; total_amount: number }> {

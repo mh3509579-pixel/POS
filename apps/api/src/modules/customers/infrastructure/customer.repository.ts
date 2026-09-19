@@ -48,11 +48,12 @@ export class CustomerRepository {
 
   async create(data: CreateCustomerDTO): Promise<Customer> {
     const result = await execute(
-      `INSERT INTO customers (name, type, phone, email, address, city, credit_limit, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO customers (name, type, phone, email, cnic, address, city, credit_limit, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.name, data.type || 'regular',
         data.phone || null, data.email || null,
+        (data as any).cnic || null,
         data.address || null, data.city || null,
         data.credit_limit || 0, data.notes || null,
       ]
@@ -69,6 +70,7 @@ export class CustomerRepository {
     if (data.type !== undefined) { fields.push('type = ?'); values.push(data.type); }
     if (data.phone !== undefined) { fields.push('phone = ?'); values.push(data.phone); }
     if (data.email !== undefined) { fields.push('email = ?'); values.push(data.email); }
+    if ((data as any).cnic !== undefined) { fields.push('cnic = ?'); values.push((data as any).cnic); }
     if (data.address !== undefined) { fields.push('address = ?'); values.push(data.address); }
     if (data.city !== undefined) { fields.push('city = ?'); values.push(data.city); }
     if (data.credit_limit !== undefined) { fields.push('credit_limit = ?'); values.push(data.credit_limit); }

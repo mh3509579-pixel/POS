@@ -2,6 +2,7 @@ import { medicineStore, Medicine } from '../stores/medicine.store';
 import { printInvoice, InvoiceData } from '../utils/invoice';
 import { authService } from '../services/auth.service';
 import { salesService } from '../services/sales.service';
+import { confirmAction, successToast, errorToast } from '../utils/alerts';
 
 export function renderPOS(): string {
   return `
@@ -330,15 +331,15 @@ export function initPOS(): () => void {
     }
   }
 
-  function clearCart(): void {
+  async function clearCart(): Promise<void> {
     if (cart.length === 0) return;
-    if (confirm('Are you sure you want to clear the cart?')) {
-      cart.length = 0;
-      discount = 0;
-      updateCart();
-      const receivedInput = document.getElementById('receivedAmount') as HTMLInputElement;
-      if (receivedInput) receivedInput.value = '';
-    }
+    const confirmed = await confirmAction('Clear Cart?', 'All items will be removed.');
+    if (!confirmed) return;
+    cart.length = 0;
+    discount = 0;
+    updateCart();
+    const receivedInput = document.getElementById('receivedAmount') as HTMLInputElement;
+    if (receivedInput) receivedInput.value = '';
   }
 
   function holdSale(): void {
@@ -352,12 +353,12 @@ export function initPOS(): () => void {
     localStorage.setItem('heldSales', JSON.stringify(heldSales));
     cart.length = 0;
     updateCart();
-    alert('Sale held successfully!');
+    successToast('Sale held successfully!');
   }
 
   async function completeSale(): Promise<void> {
     if (cart.length === 0) {
-      alert('Cart is empty!');
+      errorToast('Cart is empty!');
       return;
     }
 
@@ -369,7 +370,7 @@ export function initPOS(): () => void {
     const received = parseFloat(receivedInput?.value || '0');
 
     if (received < total) {
-      alert('Insufficient amount received!');
+      errorToast('Insufficient amount received!');
       return;
     }
 
@@ -392,6 +393,7 @@ export function initPOS(): () => void {
       });
     } catch (error) {
       console.warn('API sale creation failed, processing locally:', error);
+      errorToast('Sale API failed but processed locally.');
     }
 
     const invoiceData: InvoiceData = {
@@ -419,11 +421,9 @@ export function initPOS(): () => void {
       change: received - total,
     };
 
-    cart.forEach((item) => {
-      medicineStore.updateStock(item.id, -item.qty);
-    });
-
     printInvoice(invoiceData);
+
+    successToast('Sale completed successfully! Invoice: ' + invoiceNumber);
 
     cart.length = 0;
     discount = 0;

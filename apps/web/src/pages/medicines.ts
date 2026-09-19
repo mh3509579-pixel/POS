@@ -1,5 +1,7 @@
 import { medicineStore, Medicine } from '../stores/medicine.store';
 import { medicineService } from '../services/medicine.service';
+import { confirmDelete, successToast, errorToast } from '../utils/alerts';
+import Swal from 'sweetalert2';
 
 export function renderMedicines(): string {
   return `
@@ -50,6 +52,11 @@ export function renderMedicines(): string {
               <option value="expiring-60">Expiring in 60 days</option>
               <option value="expiring-90">Expiring in 90 days</option>
             </select>
+          </div>
+          <div class="col-md-1">
+            <button class="btn btn-outline-secondary w-100" id="resetFilters">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -192,7 +199,8 @@ export function renderMedicines(): string {
 export function initMedicines(): () => void {
   let currentPage = 1;
   const itemsPerPage = 10;
-  let filteredMedicines: Medicine[] = medicineStore.getAll();
+  let medicines: Medicine[] = medicineStore.getAll();
+  let filteredMedicines: Medicine[] = [...medicines];
 
   // Try loading from API
   medicineService.getAll({ limit: 100 }).then(({ data }) => {
@@ -213,8 +221,8 @@ export function initMedicines(): () => void {
         reorderLevel: m.reorder_level,
         description: m.description || '',
       }));
-      filteredMedicines = mapped;
-      renderTable();
+      medicines = mapped;
+      filterMedicines();
     }
   }).catch(() => {
     // Fallback to local store (already initialized)
@@ -378,9 +386,7 @@ export function initMedicines(): () => void {
     const stock = (document.getElementById('filterStock') as HTMLSelectElement)?.value || '';
     const expiry = (document.getElementById('filterExpiry') as HTMLSelectElement)?.value || '';
 
-    const allMedicines = medicineStore.getAll();
-
-    filteredMedicines = allMedicines.filter((med) => {
+    filteredMedicines = medicines.filter((med) => {
       const matchSearch =
         !search ||
         med.name.toLowerCase().includes(search) ||
@@ -422,9 +428,18 @@ export function initMedicines(): () => void {
         const id = parseInt(btn.getAttribute('data-id') || '0');
         const med = medicineStore.getById(id);
         if (med) {
-          alert(
-            `Medicine: ${med.name}\nGeneric: ${med.generic}\nCategory: ${med.category}\nBatch: ${med.batch}\nStock: ${med.stock} ${med.unit}\nExpiry: ${med.expiry}`,
-          );
+          Swal.fire({
+            title: med.name,
+            html: `<div style="text-align:left">
+              <p><strong>Generic:</strong> ${med.generic || '-'}</p>
+              <p><strong>Category:</strong> ${med.category || '-'}</p>
+              <p><strong>Stock:</strong> ${med.stock} ${med.unit}</p>
+              <p><strong>Sale Price:</strong> ₨ ${med.salePrice}</p>
+              <p><strong>Purchase Price:</strong> ₨ ${med.purchasePrice}</p>
+            </div>`,
+            icon: 'info',
+            confirmButtonColor: '#198754',
+          });
         }
       });
     });
@@ -440,12 +455,13 @@ export function initMedicines(): () => void {
     });
 
     document.querySelectorAll('.delete-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = parseInt(btn.getAttribute('data-id') || '0');
-        if (confirm('Are you sure you want to delete this medicine?')) {
-          medicineStore.delete(id);
-          filterMedicines();
-        }
+        const confirmed = await confirmDelete('medicine');
+        if (!confirmed) return;
+        medicineStore.delete(id);
+        successToast('Medicine deleted successfully!');
+        filterMedicines();
       });
     });
   }
@@ -510,10 +526,15 @@ export function initMedicines(): () => void {
       description: (document.getElementById('medicineDescription') as HTMLTextAreaElement).value,
     };
 
-    if (id) {
-      medicineStore.update(parseInt(id), medicineData);
-    } else {
-      medicineStore.add(medicineData);
+    try {
+      if (id) {
+        medicineStore.update(parseInt(id), medicineData);
+      } else {
+        medicineStore.add(medicineData);
+      }
+      successToast('Medicine saved successfully!');
+    } catch (e) {
+      errorToast('Failed to save medicine.');
     }
 
     closeModal();
@@ -525,6 +546,14 @@ export function initMedicines(): () => void {
   document.getElementById('filterCategory')?.addEventListener('change', filterMedicines);
   document.getElementById('filterStock')?.addEventListener('change', filterMedicines);
   document.getElementById('filterExpiry')?.addEventListener('change', filterMedicines);
+
+  document.getElementById('resetFilters')?.addEventListener('click', () => {
+    (document.getElementById('searchMedicine') as HTMLInputElement).value = '';
+    (document.getElementById('filterCategory') as HTMLSelectElement).value = '';
+    (document.getElementById('filterStock') as HTMLSelectElement).value = '';
+    (document.getElementById('filterExpiry') as HTMLSelectElement).value = '';
+    filterMedicines();
+  });
 
   document.getElementById('addMedicineBtn')?.addEventListener('click', () => openModal());
   document.getElementById('saveMedicineBtn')?.addEventListener('click', saveMedicine);

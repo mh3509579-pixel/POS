@@ -1,5 +1,6 @@
 import { createDonutChart, createHorizontalBarChart } from '../utils/charts';
 import { supplierService, Supplier as ApiSupplier } from '../services/supplier.service';
+import { confirmDelete, successToast, errorToast } from '../utils/alerts';
 
 interface Supplier {
   id: number;
@@ -249,7 +250,7 @@ async function loadSuppliers(): Promise<void> {
       cnic: s.tax_number || '',
       company: s.contact_person || '',
       type: s.type as 'local' | 'national' | 'international',
-      credit_limit: s.payment_terms_days * 1000,
+      credit_limit: s.payment_terms_days,
       balance: s.current_balance,
       total_purchases: s.total_purchases,
       last_purchase: s.updated_at,
@@ -567,20 +568,21 @@ function showSupplierModal(editId?: number): void {
     const rating = parseFloat((modal.querySelector('#supRating') as HTMLInputElement).value) || 4;
 
     if (!name || !phone) {
-      alert('Please fill required fields (Name, Phone)');
+      errorToast('Please fill required fields (Name, Phone)');
       return;
     }
 
     try {
       if (isEdit && supplier) {
-        await supplierService.update(supplier.id, { name, phone, email, type, address, contact_person: name, payment_terms_days: Math.ceil(creditLimit / 1000) });
+        await supplierService.update(supplier.id, { name, phone, email, type, address, contact_person: name, tax_number: (modal.querySelector('#supCnic') as HTMLInputElement)?.value || undefined, payment_terms_days: creditLimit });
       } else {
-        await supplierService.create({ name, phone, email, type, address, contact_person: name, payment_terms_days: Math.ceil(creditLimit / 1000) });
+        await supplierService.create({ name, phone, email, type, address, contact_person: name, tax_number: (modal.querySelector('#supCnic') as HTMLInputElement)?.value || undefined, payment_terms_days: creditLimit });
       }
       modal.remove();
+      successToast('Supplier saved successfully!');
       await loadSuppliers();
     } catch {
-      alert('Failed to save supplier. Please try again.');
+      errorToast('Failed to save supplier.');
     }
   });
 }
@@ -590,17 +592,19 @@ async function deleteSupplier(id: number): Promise<void> {
   if (!supplier) return;
 
   if (supplier.balance > 0) {
-    alert('Cannot delete supplier with outstanding balance!');
+    errorToast('Cannot delete supplier with outstanding balance!');
     return;
   }
 
-  if (confirm(`Are you sure you want to delete "${supplier.name}"?`)) {
-    try {
-      await supplierService.delete(id);
-      await loadSuppliers();
-    } catch {
-      alert('Failed to delete supplier. Please try again.');
-    }
+  const confirmed = await confirmDelete('supplier');
+  if (!confirmed) return;
+
+  try {
+    await supplierService.delete(id);
+    successToast('Supplier deleted successfully!');
+    await loadSuppliers();
+  } catch {
+    errorToast('Failed to delete supplier.');
   }
 }
 
@@ -817,12 +821,12 @@ function recordPayment(supplier: Supplier): void {
     const note = (modal.querySelector('#paymentNote') as HTMLInputElement).value;
 
     if (!amount || amount <= 0) {
-      alert('Please enter a valid amount');
+      errorToast('Please enter a valid amount');
       return;
     }
 
     if (amount > supplier.balance) {
-      alert('Amount cannot exceed balance!');
+      errorToast('Amount cannot exceed balance!');
       return;
     }
 
@@ -830,6 +834,6 @@ function recordPayment(supplier: Supplier): void {
     filteredSuppliers = [...suppliers];
     renderTable();
     modal.remove();
-    alert(`Payment of ₨ ${amount.toLocaleString()} recorded successfully!\nNew Balance: ₨ ${supplier.balance.toLocaleString()}`);
+    successToast(`Payment of ₨ ${amount.toLocaleString()} recorded successfully! New Balance: ₨ ${supplier.balance.toLocaleString()}`);
   });
 }

@@ -1,5 +1,6 @@
 import { medicineStore, Medicine } from '../stores/medicine.store';
 import { inventoryService } from '../services/inventory.service';
+import { confirmAction, successToast, errorToast } from '../utils/alerts';
 
 type InventoryTab = 'overview' | 'batches' | 'low-stock' | 'expiring' | 'expired' | 'movements' | 'adjustments';
 
@@ -321,6 +322,11 @@ function renderBatches(container: HTMLElement): void {
               <option value="expiry">Expiry (Nearest)</option>
             </select>
           </div>
+          <div class="col-md-1">
+            <button class="btn btn-outline-secondary w-100" id="resetBatchFilters">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -424,6 +430,12 @@ function renderBatches(container: HTMLElement): void {
   document.getElementById('searchBatch')?.addEventListener('input', renderBatchTable);
   document.getElementById('filterCategory')?.addEventListener('change', renderBatchTable);
   document.getElementById('sortBy')?.addEventListener('change', renderBatchTable);
+  document.getElementById('resetBatchFilters')?.addEventListener('click', () => {
+    (document.getElementById('searchBatch') as HTMLInputElement).value = '';
+    (document.getElementById('filterCategory') as HTMLSelectElement).value = '';
+    (document.getElementById('sortBy') as HTMLSelectElement).value = 'name';
+    renderBatchTable();
+  });
   renderBatchTable();
 }
 
@@ -435,7 +447,15 @@ function renderLowStock(container: HTMLElement): void {
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Low Stock Items</h6>
-        <span class="badge-status badge-warning">${lowStock.length} items</span>
+        <span class="badge-status badge-warning" id="lowStockCount">${lowStock.length} items</span>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="searchLowStock" placeholder="Search low stock items...">
+          </div>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -450,39 +470,53 @@ function renderLowStock(container: HTMLElement): void {
                 <th>Deficit</th>
               </tr>
             </thead>
-            <tbody>
-              ${lowStock.length === 0 ? `
-                <tr>
-                  <td colspan="6" class="text-center py-5">
-                    <div class="text-muted">
-                      <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
-                      <h6>All items are well stocked</h6>
-                    </div>
-                  </td>
-                </tr>
-              ` : lowStock.map((m) => `
-                <tr>
-                  <td>
-                    <div class="fw-semibold">${m.name}</div>
-                    <small class="text-muted">${m.generic}</small>
-                  </td>
-                  <td><code>${m.batch}</code></td>
-                  <td><span class="badge-status ${m.stock === 0 ? 'badge-danger' : 'badge-warning'}">${m.stock} ${m.unit}</span></td>
-                  <td>${m.reorderLevel} ${m.unit}</td>
-                  <td>
-                    ${m.stock === 0 ? 
-                      '<span class="badge-status badge-danger">Out of Stock</span>' : 
-                      '<span class="badge-status badge-warning">Low Stock</span>'}
-                  </td>
-                  <td class="text-danger fw-semibold">${Math.max(0, m.reorderLevel - m.stock)} ${m.unit}</td>
-                </tr>
-              `).join('')}
+            <tbody id="lowStockTableBody">
             </tbody>
           </table>
         </div>
       </div>
     </div>
   `;
+
+  function renderLowStockTable(): void {
+    const search = (document.getElementById('searchLowStock') as HTMLInputElement)?.value.toLowerCase() || '';
+    const filtered = lowStock.filter((m) => !search || m.name.toLowerCase().includes(search));
+
+    const tbody = document.getElementById('lowStockTableBody');
+    const countEl = document.getElementById('lowStockCount');
+    if (countEl) countEl.textContent = `${filtered.length} items`;
+    if (!tbody) return;
+
+    tbody.innerHTML = filtered.length === 0 ? `
+      <tr>
+        <td colspan="6" class="text-center py-5">
+          <div class="text-muted">
+            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+            <h6>All items are well stocked</h6>
+          </div>
+        </td>
+      </tr>
+    ` : filtered.map((m) => `
+      <tr>
+        <td>
+          <div class="fw-semibold">${m.name}</div>
+          <small class="text-muted">${m.generic}</small>
+        </td>
+        <td><code>${m.batch}</code></td>
+        <td><span class="badge-status ${m.stock === 0 ? 'badge-danger' : 'badge-warning'}">${m.stock} ${m.unit}</span></td>
+        <td>${m.reorderLevel} ${m.unit}</td>
+        <td>
+          ${m.stock === 0 ? 
+            '<span class="badge-status badge-danger">Out of Stock</span>' : 
+            '<span class="badge-status badge-warning">Low Stock</span>'}
+        </td>
+        <td class="text-danger fw-semibold">${Math.max(0, m.reorderLevel - m.stock)} ${m.unit}</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('searchLowStock')?.addEventListener('input', renderLowStockTable);
+  renderLowStockTable();
 }
 
 function renderExpiring(container: HTMLElement): void {
@@ -498,7 +532,15 @@ function renderExpiring(container: HTMLElement): void {
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Expiring Within 90 Days</h6>
-        <span class="badge-status badge-warning">${expiring.length} items</span>
+        <span class="badge-status badge-warning" id="expiringCount">${expiring.length} items</span>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="searchExpiring" placeholder="Search expiring items...">
+          </div>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -513,40 +555,54 @@ function renderExpiring(container: HTMLElement): void {
                 <th>Value at Risk</th>
               </tr>
             </thead>
-            <tbody>
-              ${expiring.length === 0 ? `
-                <tr>
-                  <td colspan="6" class="text-center py-5">
-                    <div class="text-muted">
-                      <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
-                      <h6>No medicines expiring soon</h6>
-                    </div>
-                  </td>
-                </tr>
-              ` : expiring.map((m) => {
-                const days = Math.ceil((new Date(m.expiry).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                return `
-                  <tr>
-                    <td>
-                      <div class="fw-semibold">${m.name}</div>
-                      <small class="text-muted">${m.generic}</small>
-                    </td>
-                    <td><code>${m.batch}</code></td>
-                    <td>${m.expiry}</td>
-                    <td>
-                      <span class="badge-status ${days <= 30 ? 'badge-danger' : 'badge-warning'}">${days} days</span>
-                    </td>
-                    <td>${m.stock} ${m.unit}</td>
-                    <td class="text-danger fw-semibold">₨ ${(m.stock * m.purchasePrice).toLocaleString()}</td>
-                  </tr>
-                `;
-              }).join('')}
+            <tbody id="expiringTableBody">
             </tbody>
           </table>
         </div>
       </div>
     </div>
   `;
+
+  function renderExpiringTable(): void {
+    const search = (document.getElementById('searchExpiring') as HTMLInputElement)?.value.toLowerCase() || '';
+    const filtered = expiring.filter((m) => !search || m.name.toLowerCase().includes(search));
+
+    const tbody = document.getElementById('expiringTableBody');
+    const countEl = document.getElementById('expiringCount');
+    if (countEl) countEl.textContent = `${filtered.length} items`;
+    if (!tbody) return;
+
+    tbody.innerHTML = filtered.length === 0 ? `
+      <tr>
+        <td colspan="6" class="text-center py-5">
+          <div class="text-muted">
+            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+            <h6>No medicines expiring soon</h6>
+          </div>
+        </td>
+      </tr>
+    ` : filtered.map((m) => {
+      const days = Math.ceil((new Date(m.expiry).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return `
+        <tr>
+          <td>
+            <div class="fw-semibold">${m.name}</div>
+            <small class="text-muted">${m.generic}</small>
+          </td>
+          <td><code>${m.batch}</code></td>
+          <td>${m.expiry}</td>
+          <td>
+            <span class="badge-status ${days <= 30 ? 'badge-danger' : 'badge-warning'}">${days} days</span>
+          </td>
+          <td>${m.stock} ${m.unit}</td>
+          <td class="text-danger fw-semibold">₨ ${(m.stock * m.purchasePrice).toLocaleString()}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('searchExpiring')?.addEventListener('input', renderExpiringTable);
+  renderExpiringTable();
 }
 
 function renderExpired(container: HTMLElement): void {
@@ -557,7 +613,15 @@ function renderExpired(container: HTMLElement): void {
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Expired Medicines</h6>
-        <span class="badge-status badge-danger">${expired.length} items</span>
+        <span class="badge-status badge-danger" id="expiredCount">${expired.length} items</span>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="searchExpired" placeholder="Search expired items...">
+          </div>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -573,37 +637,7 @@ function renderExpired(container: HTMLElement): void {
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
-              ${expired.length === 0 ? `
-                <tr>
-                  <td colspan="7" class="text-center py-5">
-                    <div class="text-muted">
-                      <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
-                      <h6>No expired medicines</h6>
-                    </div>
-                  </td>
-                </tr>
-              ` : expired.map((m) => {
-                const days = Math.ceil((Date.now() - new Date(m.expiry).getTime()) / (1000 * 60 * 60 * 24));
-                return `
-                  <tr>
-                    <td>
-                      <div class="fw-semibold">${m.name}</div>
-                      <small class="text-muted">${m.generic}</small>
-                    </td>
-                    <td><code>${m.batch}</code></td>
-                    <td>${m.expiry}</td>
-                    <td><span class="badge-status badge-danger">${days} days</span></td>
-                    <td>${m.stock} ${m.unit}</td>
-                    <td class="text-danger fw-semibold">₨ ${(m.stock * m.purchasePrice).toLocaleString()}</td>
-                    <td>
-                      <button class="btn btn-sm btn-outline-danger write-off-btn" data-id="${m.id}">
-                        <i class="bi bi-trash"></i> Write Off
-                      </button>
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
+            <tbody id="expiredTableBody">
             </tbody>
           </table>
         </div>
@@ -611,18 +645,63 @@ function renderExpired(container: HTMLElement): void {
     </div>
   `;
 
-  document.querySelectorAll('.write-off-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = parseInt(btn.getAttribute('data-id') || '0');
-      if (confirm('Are you sure you want to write off this expired medicine?')) {
-        const med = medicineStore.getById(id);
-        if (med) {
-          medicineStore.updateStock(id, -med.stock);
-          renderExpired(container);
+  function renderExpiredTable(): void {
+    const search = (document.getElementById('searchExpired') as HTMLInputElement)?.value.toLowerCase() || '';
+    const filtered = expired.filter((m) => !search || m.name.toLowerCase().includes(search));
+
+    const tbody = document.getElementById('expiredTableBody');
+    const countEl = document.getElementById('expiredCount');
+    if (countEl) countEl.textContent = `${filtered.length} items`;
+    if (!tbody) return;
+
+    tbody.innerHTML = filtered.length === 0 ? `
+      <tr>
+        <td colspan="7" class="text-center py-5">
+          <div class="text-muted">
+            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+            <h6>No expired medicines</h6>
+          </div>
+        </td>
+      </tr>
+    ` : filtered.map((m) => {
+      const days = Math.ceil((Date.now() - new Date(m.expiry).getTime()) / (1000 * 60 * 60 * 24));
+      return `
+        <tr>
+          <td>
+            <div class="fw-semibold">${m.name}</div>
+            <small class="text-muted">${m.generic}</small>
+          </td>
+          <td><code>${m.batch}</code></td>
+          <td>${m.expiry}</td>
+          <td><span class="badge-status badge-danger">${days} days</span></td>
+          <td>${m.stock} ${m.unit}</td>
+          <td class="text-danger fw-semibold">₨ ${(m.stock * m.purchasePrice).toLocaleString()}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-danger write-off-btn" data-id="${m.id}">
+              <i class="bi bi-trash"></i> Write Off
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    document.querySelectorAll('.write-off-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.getAttribute('data-id') || '0');
+        if (await confirmAction('Write Off Stock?', 'This will reduce stock quantity.')) {
+          const med = medicineStore.getById(id);
+          if (med) {
+            medicineStore.updateStock(id, -med.stock);
+            successToast('Stock written off successfully!');
+            renderExpired(container);
+          }
         }
-      }
+      });
     });
-  });
+  }
+
+  document.getElementById('searchExpired')?.addEventListener('input', renderExpiredTable);
+  renderExpiredTable();
 }
 
 async function renderMovements(container: HTMLElement): Promise<void> {
@@ -657,7 +736,27 @@ async function renderMovements(container: HTMLElement): Promise<void> {
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Stock Movements</h6>
-        <span class="text-muted">Recent activity</span>
+        <span class="text-muted" id="movementCount">Recent activity</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <input type="text" class="form-control" id="searchMovement" placeholder="Search movements...">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="filterMovementType">
+              <option value="">All Types</option>
+              <option value="purchase">Purchase</option>
+              <option value="sale">Sale</option>
+              <option value="sale_return">Sale Return</option>
+              <option value="purchase_return">Purchase Return</option>
+              <option value="adjustment">Adjustment</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -672,25 +771,44 @@ async function renderMovements(container: HTMLElement): Promise<void> {
                 <th>Reference</th>
               </tr>
             </thead>
-            <tbody>
-              ${movements.map((m) => `
-                <tr>
-                  <td>${new Date(m.date).toLocaleDateString()}</td>
-                  <td>${m.medicine}</td>
-                  <td><code>${m.batch}</code></td>
-                  <td><span class="badge-status ${typeColors[m.type] || ''} text-capitalize">${m.type}</span></td>
-                  <td class="${m.quantity > 0 ? 'text-success' : 'text-danger'} fw-semibold">
-                    ${m.quantity > 0 ? '+' : ''}${m.quantity}
-                  </td>
-                  <td><code>${m.reference}</code></td>
-                </tr>
-              `).join('')}
+            <tbody id="movementTableBody">
             </tbody>
           </table>
         </div>
       </div>
     </div>
   `;
+
+  function renderMovementTable(): void {
+    const search = (document.getElementById('searchMovement') as HTMLInputElement)?.value.toLowerCase() || '';
+    const typeFilter = (document.getElementById('filterMovementType') as HTMLSelectElement)?.value || '';
+
+    const filtered = movements.filter((m) => {
+      const matchSearch = !search || m.medicine.toLowerCase().includes(search) || m.batch.toLowerCase().includes(search);
+      const matchType = !typeFilter || m.type === typeFilter;
+      return matchSearch && matchType;
+    });
+
+    const tbody = document.getElementById('movementTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = filtered.map((m) => `
+      <tr>
+        <td>${new Date(m.date).toLocaleDateString()}</td>
+        <td>${m.medicine}</td>
+        <td><code>${m.batch}</code></td>
+        <td><span class="badge-status ${typeColors[m.type] || ''} text-capitalize">${m.type}</span></td>
+        <td class="${m.quantity > 0 ? 'text-success' : 'text-danger'} fw-semibold">
+          ${m.quantity > 0 ? '+' : ''}${m.quantity}
+        </td>
+        <td><code>${m.reference}</code></td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('searchMovement')?.addEventListener('input', renderMovementTable);
+  document.getElementById('filterMovementType')?.addEventListener('change', renderMovementTable);
+  renderMovementTable();
 }
 
 function renderAdjustments(container: HTMLElement): void {
@@ -787,14 +905,14 @@ function renderAdjustments(container: HTMLElement): void {
 
     const med = medicineStore.getById(medicineId);
     if (!med) {
-      alert('Please select a medicine');
+      errorToast('Please select a medicine');
       return;
     }
 
     const adjustQuantity = type === 'add' ? quantity : -quantity;
     
     if (type === 'remove' && quantity > med.stock) {
-      alert('Cannot remove more than available stock');
+      errorToast('Cannot remove more than available stock');
       return;
     }
 
@@ -820,6 +938,6 @@ function renderAdjustments(container: HTMLElement): void {
     }
 
     (document.getElementById('adjustmentForm') as HTMLFormElement)?.reset();
-    alert('Stock adjustment submitted successfully!');
+    successToast('Stock adjustment submitted successfully!');
   });
 }

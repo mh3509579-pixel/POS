@@ -11,6 +11,9 @@ import { suppliersRoutes } from '../../modules/suppliers/presentation/supplier.r
 import { backupRoutes } from '../../modules/backup/presentation/backup.routes.js';
 import { notificationRoutes } from '../../modules/notifications/presentation/notification.routes.js';
 import { inventoryRoutes } from '../../modules/inventory/presentation/inventory.routes.js';
+import { auditRoutes } from '../../modules/audit/presentation/audit.routes.js';
+import { settingsRoutes } from '../../modules/settings/presentation/settings.routes.js';
+import { reportsRoutes } from '../../modules/reports/presentation/reports.routes.js';
 import { demoRoutes } from './demo.routes.js';
 
 const routes = Router();
@@ -28,5 +31,8 @@ routes.use('/transactions', expensesRoutes);
 routes.use('/backup', backupRoutes);
 routes.use('/notifications', notificationRoutes);
 routes.use('/inventory', inventoryRoutes);
+routes.use(auditRoutes);
+routes.use(settingsRoutes);
+routes.use(reportsRoutes);
 
 export { routes };
