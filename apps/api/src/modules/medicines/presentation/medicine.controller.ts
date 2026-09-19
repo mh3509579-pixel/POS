@@ -56,13 +56,17 @@ export async function createMedicine(req: Request, res: Response, next: NextFunc
 
     let medicine;
     try {
+      console.log('[Create Medicine] body:', JSON.stringify(req.body));
       medicine = await medicineRepo.create(req.body);
+      console.log('[Create Medicine] success, id:', medicine.id);
     } catch (dbError: any) {
-      console.error('[Create Medicine DB Error]', dbError.message, dbError.code);
-      if (dbError.code === 'ER_DUP_ENTRY') {
+      console.error('[Create Medicine DB Error full:', dbError);
+      const errMsg = dbError?.message || dbError?.sqlMessage || dbError?.code || JSON.stringify(dbError) || 'Unknown DB error';
+      const errCode = dbError?.code || 'UNKNOWN';
+      if (errCode === 'ER_DUP_ENTRY') {
         res.status(400).json({ status: 'error', message: 'A medicine with this barcode already exists' });
       } else {
-        res.status(500).json({ status: 'error', message: `Database error: ${dbError.message}` });
+        res.status(500).json({ status: 'error', message: `Database error: ${errMsg}` });
       }
       return;
     }

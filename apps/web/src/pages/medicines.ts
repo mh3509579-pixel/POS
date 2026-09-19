@@ -356,8 +356,8 @@ export function initMedicines(): () => void {
             <span class="fw-semibold">${med.stock}</span>
             <small class="text-muted">${med.unit}</small>
           </td>
-          <td>₨ ${med.purchasePrice.toFixed(2)}</td>
-          <td>₨ ${med.salePrice.toFixed(2)}</td>
+          <td>₨ ${Number(med.purchasePrice).toFixed(2)}</td>
+          <td>₨ ${Number(med.salePrice).toFixed(2)}</td>
           <td><span class="badge-status ${stockStatus.class}">${stockStatus.text}</span></td>
           <td class="text-end">
             <div class="btn-group btn-group-sm">
