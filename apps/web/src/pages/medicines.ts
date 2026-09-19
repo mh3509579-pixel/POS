@@ -80,7 +80,7 @@ export function renderMedicines(): string {
                 <th>Purchase Price</th>
                 <th>Sale Price</th>
                 <th>Status</th>
-                <th class="text-end">Actions</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="medicinesTableBody">
@@ -343,9 +343,9 @@ export function initMedicines(): () => void {
               <div class="product-icon" style="width:36px;height:36px;min-width:36px;">
                 <i class="bi ${getCategoryIcon(med.category)}" style="font-size:14px;"></i>
               </div>
-              <div>
-                <div class="fw-semibold">${med.name}</div>
-                <small class="text-muted">${med.generic}</small>
+              <div style="min-width:0">
+                <div class="fw-semibold text-truncate" style="max-width:200px;">${med.name}</div>
+                <small class="text-muted text-truncate d-block" style="max-width:200px;">${med.generic || '-'}</small>
               </div>
             </div>
           </td>
@@ -354,12 +354,12 @@ export function initMedicines(): () => void {
           <td><span class="badge-status ${expiryStatus.class}">${expiryStatus.text}</span></td>
           <td>
             <span class="fw-semibold">${med.stock}</span>
-            <small class="text-muted">${med.unit}</small>
+            <small class="text-muted d-block">${med.unit}</small>
           </td>
           <td>₨ ${Number(med.purchasePrice).toFixed(2)}</td>
           <td>₨ ${Number(med.salePrice).toFixed(2)}</td>
           <td><span class="badge-status ${stockStatus.class}">${stockStatus.text}</span></td>
-          <td class="text-end">
+          <td>
             <div class="btn-group btn-group-sm">
               <button class="btn btn-outline-secondary view-btn" data-id="${med.id}" title="View">
                 <i class="bi bi-eye"></i>
@@ -508,6 +508,7 @@ export function initMedicines(): () => void {
           await medicineService.delete(id);
           successToast('Medicine deleted successfully!');
           await loadMedicines();
+          medicineStore.refresh();
         } catch {
           errorToast('Failed to delete medicine.');
         }
@@ -629,6 +630,7 @@ export function initMedicines(): () => void {
       successToast(id ? 'Medicine updated successfully!' : 'Medicine added successfully!');
       closeModal();
       await loadMedicines();
+      medicineStore.refresh();
     } catch (e: any) {
       console.error('Save medicine error:', e);
       const msg = e?.response?.data?.message || e?.message || 'Failed to save medicine. Please try again.';

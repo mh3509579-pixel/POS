@@ -29,6 +29,15 @@ class MedicineStore {
 
   async loadMedicines(): Promise<void> {
     if (this.loaded) return;
+    await this.fetchMedicines();
+  }
+
+  async refresh(): Promise<void> {
+    this.loaded = false;
+    await this.fetchMedicines();
+  }
+
+  private async fetchMedicines(): Promise<void> {
     try {
       const response = await api.get<{ status: string; data: any[] }>('/medicines?limit=500');
       this.medicines = response.data.data.map((m: any) => ({

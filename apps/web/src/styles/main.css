@@ -1570,10 +1570,12 @@ body {
 /* Table Improvements */
 .table th {
   white-space: nowrap;
+  text-align: left;
 }
 
 .table td {
   white-space: nowrap;
+  text-align: left;
 }
 
 /* Responsive Adjustments */
