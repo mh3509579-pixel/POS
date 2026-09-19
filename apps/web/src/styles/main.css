@@ -385,12 +385,11 @@ body {
 .sidebar-header .brand-text h5 {
   margin: 0;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: var(--bg-white);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .sidebar-header .brand-text small {
