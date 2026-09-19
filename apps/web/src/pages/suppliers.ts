@@ -250,11 +250,11 @@ async function loadSuppliers(): Promise<void> {
       cnic: s.tax_number || '',
       company: s.contact_person || '',
       type: s.type as 'local' | 'national' | 'international',
-      credit_limit: s.payment_terms_days,
-      balance: s.current_balance,
-      total_purchases: s.total_purchases,
+      credit_limit: Number(s.payment_terms_days) || 0,
+      balance: Number(s.current_balance) || 0,
+      total_purchases: Number(s.total_purchases) || 0,
       last_purchase: s.updated_at,
-      rating: s.rating,
+      rating: Number(s.rating) || 0,
       created_at: s.created_at,
     }));
     filteredSuppliers = [...suppliers];

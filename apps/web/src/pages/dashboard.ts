@@ -122,23 +122,23 @@ async function fetchDashboardData(): Promise<DashboardData> {
       },
       customers: {
         total: customersData.total || customersData.data?.length || 0,
-        pendingReceivable: customersData.data?.filter((c: any) => (c.current_balance || 0) > 0).reduce((sum: number, c: any) => sum + (c.current_balance || 0), 0) || 0,
+        pendingReceivable: customersData.data?.filter((c: any) => (Number(c.current_balance) || 0) > 0).reduce((sum: number, c: any) => sum + Number(c.current_balance || 0), 0) || 0,
         topCustomers: (customersData.data || [])
-          .filter((c: any) => (c.current_balance || 0) > 0)
-          .sort((a: any, b: any) => (b.current_balance || 0) - (a.current_balance || 0))
+          .filter((c: any) => (Number(c.current_balance) || 0) > 0)
+          .sort((a: any, b: any) => (Number(b.current_balance) || 0) - (Number(a.current_balance) || 0))
           .slice(0, 4)
-          .map((c: any) => ({ name: c.name, type: c.type || 'regular', balance: c.current_balance || 0 })),
+          .map((c: any) => ({ name: c.name, type: c.type || 'regular', balance: Number(c.current_balance) || 0 })),
       },
       suppliers: {
         total: suppliersData.total || suppliersData.data?.length || 0,
-        pendingPayable: suppliersData.data?.filter((s: any) => (s.current_balance || 0) > 0).reduce((sum: number, s: any) => sum + (s.current_balance || 0), 0) || 0,
+        pendingPayable: suppliersData.data?.filter((s: any) => (Number(s.current_balance) || 0) > 0).reduce((sum: number, s: any) => sum + Number(s.current_balance || 0), 0) || 0,
       },
       expenses: {
-        today: todayExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0),
-        thisMonth: expensesData.data?.reduce((sum: number, e: any) => sum + (e.amount || 0), 0) || 0,
+        today: todayExpenses.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0),
+        thisMonth: expensesData.data?.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0) || 0,
       },
       accounting: {
-        revenue: salesData.data?.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0) || 0,
+        revenue: salesData.data?.reduce((sum: number, s: any) => sum + Number(s.total_amount || 0), 0) || 0,
         cogs: 0,
         grossProfit: 0,
         netProfit: 0,

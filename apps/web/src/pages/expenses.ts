@@ -81,7 +81,7 @@ async function loadExpenses(): Promise<void> {
       category: e.category_name || 'Miscellaneous',
       subcategory: '',
       description: e.description,
-      amount: e.amount,
+      amount: Number(e.amount) || 0,
       payment_method: e.payment_method === 'bank_transfer' ? 'bank' : e.payment_method,
       reference: e.expense_number || '',
       vendor: '',

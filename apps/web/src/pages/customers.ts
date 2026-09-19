@@ -229,9 +229,9 @@ async function loadCustomers(): Promise<void> {
       address: c.address || '',
       cnic: c.cnic || '',
       type: c.type as 'regular' | 'premium' | 'wholesale',
-      credit_limit: c.credit_limit,
-      balance: c.current_balance,
-      total_purchases: c.total_purchases,
+      credit_limit: Number(c.credit_limit) || 0,
+      balance: Number(c.current_balance) || 0,
+      total_purchases: Number(c.total_purchases) || 0,
       last_purchase: c.updated_at,
       created_at: c.created_at,
     }));
