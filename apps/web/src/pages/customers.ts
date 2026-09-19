@@ -2,6 +2,13 @@ import { createDonutChart, createHorizontalBarChart } from '../utils/charts';
 import { customerService, Customer as ApiCustomer } from '../services/customer.service';
 import { confirmDelete, successToast, errorToast } from '../utils/alerts';
 
+function formatAmount(n: number): string {
+  if (n >= 10000000) return `₨ ${(n / 10000000).toFixed(1)}Cr`;
+  if (n >= 100000) return `₨ ${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₨ ${(n / 1000).toFixed(1)}K`;
+  return `₨ ${n.toFixed(0)}`;
+}
+
 interface Customer {
   id: number;
   name: string;
@@ -176,8 +183,8 @@ function renderStats(): void {
 
   if (totalEl) totalEl.textContent = String(total);
   if (premiumEl) premiumEl.textContent = String(premium);
-  if (receivableEl) receivableEl.textContent = `₨ ${receivable.toLocaleString()}`;
-  if (salesEl) salesEl.textContent = `₨ ${sales.toLocaleString()}`;
+  if (receivableEl) receivableEl.textContent = formatAmount(receivable);
+  if (salesEl) salesEl.textContent = formatAmount(sales);
 }
 
 function renderCharts(): void {
@@ -379,12 +386,12 @@ function renderGridView(container: HTMLElement): void {
                 <div class="d-flex justify-content-between mb-2">
                   <small class="text-muted">Balance:</small>
                   <small class="${c.balance > 0 ? 'text-danger' : 'text-success'} fw-semibold">
-                    ${c.balance > 0 ? `₨ ${c.balance.toLocaleString()}` : 'Clear'}
+                    ${c.balance > 0 ? formatAmount(c.balance) : 'Clear'}
                   </small>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                   <small class="text-muted">Total Purchases:</small>
-                  <small class="fw-semibold">₨ ${c.total_purchases.toLocaleString()}</small>
+                  <small class="fw-semibold">${formatAmount(c.total_purchases)}</small>
                 </div>
                 <div class="d-flex justify-content-between">
                   <small class="text-muted">Last Purchase:</small>
@@ -397,7 +404,7 @@ function renderGridView(container: HTMLElement): void {
                      style="width: ${Math.min((c.total_purchases / c.credit_limit) * 100, 100)}%"></div>
               </div>
               <small class="text-muted d-block mb-3">
-                Credit: ₨ ${c.credit_limit.toLocaleString()}
+                Credit: ${formatAmount(c.credit_limit)}
               </small>
 
               <div class="d-flex gap-2">
@@ -485,13 +492,13 @@ function renderTableView(container: HTMLElement): void {
                   </td>
                   <td><span class="badge-status ${typeColors[c.type]} text-capitalize">${c.type}</span></td>
                   <td><code>${c.cnic || '-'}</code></td>
-                  <td class="text-end">₨ ${c.credit_limit.toLocaleString()}</td>
+                  <td class="text-end">${formatAmount(c.credit_limit)}</td>
                   <td class="text-end">
                     <span class="${c.balance > 0 ? 'text-danger fw-semibold' : 'text-success'}">
-                      ${c.balance > 0 ? `₨ ${c.balance.toLocaleString()}` : 'Clear'}
+                      ${c.balance > 0 ? formatAmount(c.balance) : 'Clear'}
                     </span>
                   </td>
-                  <td class="text-end">₨ ${c.total_purchases.toLocaleString()}</td>
+                  <td class="text-end">${formatAmount(c.total_purchases)}</td>
                   <td>${c.last_purchase ? new Date(c.last_purchase).toLocaleDateString() : 'Never'}</td>
                   <td class="text-end">
                     <div class="btn-group btn-group-sm">
@@ -726,20 +733,20 @@ function viewCustomerDetails(id: number): void {
                   <div class="d-flex justify-content-between mb-2">
                     <span>Balance:</span>
                     <span class="fw-bold ${customer.balance > 0 ? 'text-danger' : 'text-success'}">
-                      ${customer.balance > 0 ? `₨ ${customer.balance.toLocaleString()}` : 'Clear'}
+                      ${customer.balance > 0 ? formatAmount(customer.balance) : 'Clear'}
                     </span>
                   </div>
                   <div class="d-flex justify-content-between mb-2">
                     <span>Credit Limit:</span>
-                    <span>₨ ${customer.credit_limit.toLocaleString()}</span>
+                    <span>${formatAmount(customer.credit_limit)}</span>
                   </div>
                   <div class="d-flex justify-content-between mb-2">
                     <span>Available Credit:</span>
-                    <span class="text-success">₨ ${(customer.credit_limit - customer.balance).toLocaleString()}</span>
+                    <span class="text-success">${formatAmount(customer.credit_limit - customer.balance)}</span>
                   </div>
                   <div class="d-flex justify-content-between">
                     <span>Total Purchases:</span>
-                    <span class="fw-bold">₨ ${customer.total_purchases.toLocaleString()}</span>
+                    <span class="fw-bold">${formatAmount(customer.total_purchases)}</span>
                   </div>
                 </div>
               </div>
@@ -771,9 +778,9 @@ function viewCustomerDetails(id: number): void {
                     </td>
                     <td><code>${t.invoice}</code></td>
                     <td>${t.description}</td>
-                    <td class="text-end">${t.debit > 0 ? `₨ ${t.debit.toLocaleString()}` : '-'}</td>
-                    <td class="text-end">${t.credit > 0 ? `₨ ${t.credit.toLocaleString()}` : '-'}</td>
-                    <td class="text-end fw-semibold">₨ ${(t.balance || 0).toLocaleString()}</td>
+                    <td class="text-end">${t.debit > 0 ? formatAmount(t.debit) : '-'}</td>
+                    <td class="text-end">${t.credit > 0 ? formatAmount(t.credit) : '-'}</td>
+                    <td class="text-end fw-semibold">${formatAmount(t.balance || 0)}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -827,7 +834,7 @@ function recordPayment(customer: Customer): void {
           <div class="alert alert-info">
             <div class="d-flex justify-content-between">
               <span>Current Balance:</span>
-              <strong>₨ ${customer.balance.toLocaleString()}</strong>
+              <strong>${formatAmount(customer.balance)}</strong>
             </div>
           </div>
           
@@ -887,6 +894,6 @@ function recordPayment(customer: Customer): void {
     filteredCustomers = [...customers];
     renderView();
     modal.remove();
-    successToast(`Payment of ₨ ${amount.toLocaleString()} recorded successfully! New Balance: ₨ ${customer.balance.toLocaleString()}`);
+    successToast(`Payment of ${formatAmount(amount)} recorded successfully! New Balance: ${formatAmount(customer.balance)}`);
   });
 }
