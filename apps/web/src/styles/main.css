@@ -605,6 +605,17 @@ body {
   padding: 1.25rem;
   border: 1px solid var(--brand-border);
   transition: all 0.2s ease;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.stat-card .d-flex {
+  min-width: 0;
+}
+
+.stat-card .d-flex > div:first-child {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stat-card:hover {
@@ -647,6 +658,11 @@ body {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0.5rem 0 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
 }
 
 .stat-card .stat-label {
@@ -1853,6 +1869,10 @@ body {
   }
   .page-content {
     padding: 1rem !important;
+    overflow-x: hidden;
+  }
+  body {
+    overflow-x: hidden;
   }
   .stat-value {
     font-size: 1.3rem;
@@ -1910,6 +1930,9 @@ body {
   }
   .stat-card {
     padding: 0.75rem;
+  }
+  .stat-value {
+    font-size: 1.3rem;
   }
   .table th, .table td {
     padding: 0.5rem 0.4rem;
