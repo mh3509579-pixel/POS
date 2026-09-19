@@ -3,9 +3,13 @@ import { notificationService } from '../services/notification.service';
 
 function hasPermission(page: string, role: string): boolean {
   const rolePermissions: Record<string, string[]> = {
+    SUPER_ADMIN: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports', 'users', 'audit', 'backup', 'settings'],
     admin: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports', 'users', 'audit', 'backup', 'settings'],
-    stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
-    cashier: ['dashboard', 'pos', 'customers'],
+    pharmacist: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'reports'],
+    cashier: ['dashboard', 'pos', 'customers', 'sales'],
+    inventory_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
+    stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers'],
+    accountant: ['dashboard', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports'],
   };
   return rolePermissions[role]?.includes(page) ?? false;
 }

@@ -30,7 +30,7 @@ const rolePages: Record<string, string[]> = {
   pharmacist: ['dashboard', 'pos', 'medicines', 'inventory', 'purchases', 'sales', 'customers', 'suppliers', 'expenses', 'reports'],
   cashier: ['dashboard', 'pos', 'customers', 'sales'],
   inventory_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
-  stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers', 'sales'],
+  stock_manager: ['dashboard', 'medicines', 'inventory', 'purchases', 'suppliers'],
   accountant: ['dashboard', 'expenses', 'chart-of-accounts', 'journal-entries', 'trial-balance', 'reports'],
 };
 

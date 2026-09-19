@@ -69,28 +69,30 @@ async function fetchDashboardData(): Promise<DashboardData> {
     const todayPurchases = purchasesData.data?.filter((p: any) => p.created_at?.startsWith(today)) || [];
     const todayExpenses = expensesData.data?.filter((e: any) => e.expense_date?.startsWith(today)) || [];
 
+    const getAmount = (item: any) => Number(item.total_amount || item.total || 0);
+
     return {
       sales: {
-        today: todaySales.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0),
-        thisWeek: salesData.data?.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0) || 0,
-        thisMonth: salesData.data?.reduce((sum: number, s: any) => sum + (s.total_amount || 0), 0) || 0,
+        today: todaySales.reduce((sum: number, s: any) => sum + getAmount(s), 0),
+        thisWeek: salesData.data?.reduce((sum: number, s: any) => sum + getAmount(s), 0) || 0,
+        thisMonth: salesData.data?.reduce((sum: number, s: any) => sum + getAmount(s), 0) || 0,
         todayCount: todaySales.length,
         recent: (salesData.data || []).slice(0, 5).map((s: any) => ({
           invoice: s.invoice_number,
           customer: s.customer_name || 'Walk-in Customer',
-          amount: s.total_amount,
+          amount: getAmount(s),
           status: s.status,
           date: s.created_at,
         })),
       },
       purchases: {
-        today: todayPurchases.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0),
-        thisMonth: purchasesData.data?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || 0,
-        pendingPayments: purchasesData.data?.filter((p: any) => p.payment_status !== 'paid').reduce((sum: number, p: any) => sum + (p.total_amount - (p.paid_amount || 0)), 0) || 0,
+        today: todayPurchases.reduce((sum: number, p: any) => sum + getAmount(p), 0),
+        thisMonth: purchasesData.data?.reduce((sum: number, p: any) => sum + getAmount(p), 0) || 0,
+        pendingPayments: purchasesData.data?.filter((p: any) => p.payment_status !== 'paid').reduce((sum: number, p: any) => sum + (getAmount(p) - Number(p.paid_amount || 0)), 0) || 0,
         recent: (purchasesData.data || []).slice(0, 5).map((p: any) => ({
-          po: p.purchase_number,
+          po: p.purchase_number || p.invoice_number || '-',
           supplier: p.supplier_name || 'Unknown',
-          amount: p.total_amount,
+          amount: getAmount(p),
           status: p.status,
           date: p.created_at,
         })),
