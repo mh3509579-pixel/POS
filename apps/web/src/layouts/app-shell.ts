@@ -87,7 +87,7 @@ export function renderAppShell(): string {
               <div class="user-name">${user?.full_name || 'Guest User'}</div>
               <div class="user-role">${user?.role_name || 'User'}</div>
             </div>
-            <button class="btn btn-link text-white p-0" title="Logout">
+            <button class="btn btn-link text-white p-0" title="Logout" id="sidebarLogoutBtn">
               <i class="bi bi-box-arrow-right"></i>
             </button>
           </div>

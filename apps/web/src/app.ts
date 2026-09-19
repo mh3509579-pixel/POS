@@ -259,6 +259,7 @@ function initSidebar(): void {
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('toggleSidebar');
   const logoutBtn = document.getElementById('logoutBtn');
+  const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
   const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 
   toggleBtn?.addEventListener('click', () => {
@@ -271,11 +272,14 @@ function initSidebar(): void {
     sidebarBackdrop?.classList.remove('active');
   });
 
-  logoutBtn?.addEventListener('click', () => {
+  function doLogout() {
     authService.logout();
     isLoggedIn = false;
     showLogin();
-  });
+  }
+
+  logoutBtn?.addEventListener('click', doLogout);
+  sidebarLogoutBtn?.addEventListener('click', doLogout);
 
   document.querySelectorAll('.sidebar-nav .nav-item').forEach((item) => {
     item.addEventListener('click', (e) => {
