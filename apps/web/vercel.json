@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://hussain-pharmacy-api.vercel.app/api/$1"
+      "destination": "https://api-mocha-zeta.vercel.app/api/$1"
     }
   ]
 }
