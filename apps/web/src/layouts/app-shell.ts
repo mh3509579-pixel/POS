@@ -93,6 +93,7 @@ export function renderAppShell(): string {
           </div>
         </div>
       </aside>
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
       <main class="main-content">
         <header class="topbar">

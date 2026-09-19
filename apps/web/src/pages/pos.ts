@@ -25,10 +25,17 @@ export function renderPOS(): string {
           </div>
         </div>
         <div class="products-grid" id="productsGrid"></div>
+        <button class="pos-cart-toggle" id="posCartToggle" title="Open Cart">
+          <i class="bi bi-cart3"></i>
+          <span class="cart-count-badge" id="cartCountBadge">0</span>
+        </button>
       </div>
 
       <!-- Right Side: Cart -->
-      <div class="pos-cart">
+      <div class="pos-cart" id="posCart">
+        <button class="pos-cart-close d-lg-none" id="posCartClose" title="Close Cart">
+          <i class="bi bi-x-lg"></i>
+        </button>
         <div class="cart-header">
           <h3><i class="bi bi-cart3"></i> Current Sale</h3>
           <div class="cart-actions">
@@ -304,6 +311,7 @@ export function initPOS(): () => void {
     }
 
     updateTotals();
+    updateCartBadge();
   }
 
   function updateTotals(): void {
@@ -488,6 +496,24 @@ export function initPOS(): () => void {
   document.querySelector('.modal-close')?.addEventListener('click', () => {
     document.getElementById('customerModal')?.classList.remove('active');
   });
+
+  // Mobile cart toggle
+  const posCart = document.getElementById('posCart');
+  const cartToggleBtn = document.getElementById('posCartToggle');
+  const cartCloseBtn = document.getElementById('posCartClose');
+
+  cartToggleBtn?.addEventListener('click', () => {
+    posCart?.classList.add('show');
+  });
+  cartCloseBtn?.addEventListener('click', () => {
+    posCart?.classList.remove('show');
+  });
+
+  // Auto-open cart on desktop, close on mobile when adding item
+  function updateCartBadge() {
+    const badge = document.getElementById('cartCountBadge');
+    if (badge) badge.textContent = String(cart.length);
+  }
 
   document.querySelectorAll('.customer-item').forEach((item) => {
     item.addEventListener('click', () => {

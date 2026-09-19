@@ -259,9 +259,16 @@ function initSidebar(): void {
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('toggleSidebar');
   const logoutBtn = document.getElementById('logoutBtn');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 
   toggleBtn?.addEventListener('click', () => {
     sidebar?.classList.toggle('show');
+    sidebarBackdrop?.classList.toggle('active');
+  });
+
+  sidebarBackdrop?.addEventListener('click', () => {
+    sidebar?.classList.remove('show');
+    sidebarBackdrop?.classList.remove('active');
   });
 
   logoutBtn?.addEventListener('click', () => {
@@ -276,6 +283,10 @@ function initSidebar(): void {
       const page = item.getAttribute('data-page');
       if (page) {
         navigateTo(page);
+        if (window.innerWidth <= 992) {
+          sidebar?.classList.remove('show');
+          sidebarBackdrop?.classList.remove('active');
+        }
       }
     });
   });
