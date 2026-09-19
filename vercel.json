@@ -2,10 +2,11 @@
   "buildCommand": "npm install && npm run build -w apps/web",
   "outputDirectory": "apps/web/dist",
   "installCommand": "npm install",
+  "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      "source": "/api/(.*)",
+      "destination": "https://hussain-pharmacy-api.vercel.app/api/$1"
     }
   ]
 }
