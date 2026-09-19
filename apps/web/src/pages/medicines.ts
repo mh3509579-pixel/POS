@@ -199,34 +199,79 @@ export function renderMedicines(): string {
 export function initMedicines(): () => void {
   let currentPage = 1;
   const itemsPerPage = 10;
-  let medicines: Medicine[] = medicineStore.getAll();
-  let filteredMedicines: Medicine[] = [...medicines];
+  let medicines: Medicine[] = [];
+  let filteredMedicines: Medicine[] = [];
 
-  // Try loading from API
-  medicineService.getAll({ limit: 100 }).then(({ data }) => {
-    if (data && data.length > 0) {
-      const mapped: Medicine[] = data.map((m) => ({
-        id: m.id,
-        name: m.name,
-        generic: m.generic_name || '',
-        category: m.category_name?.toLowerCase() || 'tablets',
-        batch: m.batches?.[0]?.batch_number || '',
-        expiry: m.batches?.[0]?.expiry_date || '',
-        stock: m.total_stock,
-        purchasePrice: m.batches?.[0]?.purchase_price || 0,
-        salePrice: m.batches?.[0]?.sale_price || 0,
-        barcode: m.barcode || '',
-        manufacturer: m.manufacturer_name || '',
-        unit: m.unit_name || 'tab',
-        reorderLevel: m.reorder_level,
-        description: m.description || '',
-      }));
-      medicines = mapped;
-      filterMedicines();
+  async function loadMedicines(): Promise<void> {
+    try {
+      const { data } = await medicineService.getAll({ limit: 100 });
+      if (data && data.length > 0) {
+        medicines = data.map((m) => ({
+          id: m.id,
+          name: m.name,
+          generic: m.generic_name || '',
+          category: m.category_name || '',
+          category_id: m.category_id ?? null,
+          manufacturer: m.manufacturer_name || '',
+          manufacturer_id: m.manufacturer_id ?? null,
+          unit: m.unit_name || '',
+          unit_id: m.unit_id ?? null,
+          batch: m.batches?.[0]?.batch_number || '',
+          expiry: m.batches?.[0]?.expiry_date || '',
+          stock: m.total_stock,
+          purchasePrice: m.batches?.[0]?.purchase_price || 0,
+          salePrice: m.batches?.[0]?.sale_price || 0,
+          barcode: m.barcode || '',
+          reorderLevel: m.reorder_level,
+          description: m.description || '',
+        }));
+      } else {
+        medicines = [];
+      }
+    } catch {
+      medicines = [];
     }
-  }).catch(() => {
-    // Fallback to local store (already initialized)
-  });
+    filterMedicines();
+  }
+
+  async function loadDropdowns(): Promise<void> {
+    try {
+      const [categories, manufacturers, units] = await Promise.all([
+        medicineService.getCategories(),
+        medicineService.getManufacturers(),
+        medicineService.getUnits(),
+      ]);
+
+      const catSelect = document.getElementById('medicineCategory') as HTMLSelectElement;
+      if (catSelect) {
+        catSelect.innerHTML = '<option value="">Select Category</option>' +
+          categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      }
+
+      const mfgSelect = document.getElementById('medicineManufacturer') as HTMLSelectElement;
+      if (mfgSelect) {
+        mfgSelect.innerHTML = '<option value="">Select Manufacturer</option>' +
+          manufacturers.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      }
+
+      const unitSelect = document.getElementById('medicineUnit') as HTMLSelectElement;
+      if (unitSelect) {
+        unitSelect.innerHTML = '<option value="">Select Unit</option>' +
+          units.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+      }
+
+      const filterCatSelect = document.getElementById('filterCategory') as HTMLSelectElement;
+      if (filterCatSelect) {
+        filterCatSelect.innerHTML = '<option value="">All Categories</option>' +
+          categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      }
+    } catch {
+      // Keep hardcoded options as fallback
+    }
+  }
+
+  loadMedicines();
+  loadDropdowns();
 
   function getCategoryIcon(category: string): string {
     const icons: Record<string, string> = {
@@ -426,7 +471,7 @@ export function initMedicines(): () => void {
     document.querySelectorAll('.view-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.getAttribute('data-id') || '0');
-        const med = medicineStore.getById(id);
+        const med = medicines.find((m) => m.id === id);
         if (med) {
           Swal.fire({
             title: med.name,
@@ -447,7 +492,7 @@ export function initMedicines(): () => void {
     document.querySelectorAll('.edit-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.getAttribute('data-id') || '0');
-        const med = medicineStore.getById(id);
+        const med = medicines.find((m) => m.id === id);
         if (med) {
           openModal(med);
         }
@@ -459,9 +504,13 @@ export function initMedicines(): () => void {
         const id = parseInt(btn.getAttribute('data-id') || '0');
         const confirmed = await confirmDelete('medicine');
         if (!confirmed) return;
-        medicineStore.delete(id);
-        successToast('Medicine deleted successfully!');
-        filterMedicines();
+        try {
+          await medicineService.delete(id);
+          successToast('Medicine deleted successfully!');
+          await loadMedicines();
+        } catch {
+          errorToast('Failed to delete medicine.');
+        }
       });
     });
   }
@@ -476,8 +525,9 @@ export function initMedicines(): () => void {
       (document.getElementById('medicineId') as HTMLInputElement).value = String(med.id);
       (document.getElementById('medicineName') as HTMLInputElement).value = med.name;
       (document.getElementById('genericName') as HTMLInputElement).value = med.generic;
-      (document.getElementById('medicineCategory') as HTMLSelectElement).value = med.category;
-      (document.getElementById('medicineUnit') as HTMLSelectElement).value = med.unit;
+      (document.getElementById('medicineCategory') as HTMLSelectElement).value = med.category_id != null ? String(med.category_id) : '';
+      (document.getElementById('medicineManufacturer') as HTMLSelectElement).value = med.manufacturer_id != null ? String(med.manufacturer_id) : '';
+      (document.getElementById('medicineUnit') as HTMLSelectElement).value = med.unit_id != null ? String(med.unit_id) : '';
       (document.getElementById('batchNumber') as HTMLInputElement).value = med.batch;
       (document.getElementById('expiryDate') as HTMLInputElement).value = med.expiry;
       (document.getElementById('barcode') as HTMLInputElement).value = med.barcode;
@@ -502,43 +552,88 @@ export function initMedicines(): () => void {
     }
   }
 
-  function saveMedicine(): void {
-    const form = document.getElementById('medicineForm') as HTMLFormElement;
-    if (!form?.checkValidity()) {
-      form?.reportValidity();
+  async function saveMedicine(): Promise<void> {
+    const name = (document.getElementById('medicineName') as HTMLInputElement).value.trim();
+    if (!name) {
+      errorToast('Medicine name is required');
+      return;
+    }
+
+    const batchNumber = (document.getElementById('batchNumber') as HTMLInputElement).value.trim();
+    const expiryDate = (document.getElementById('expiryDate') as HTMLInputElement).value;
+    const purchasePrice = parseFloat((document.getElementById('purchasePrice') as HTMLInputElement).value);
+    const salePrice = parseFloat((document.getElementById('salePrice') as HTMLInputElement).value);
+    const stock = parseInt((document.getElementById('initialStock') as HTMLInputElement).value);
+
+    if (!batchNumber) {
+      errorToast('Batch number is required');
+      return;
+    }
+    if (!expiryDate) {
+      errorToast('Expiry date is required');
+      return;
+    }
+    if (isNaN(purchasePrice) || purchasePrice < 0) {
+      errorToast('Valid purchase price is required');
+      return;
+    }
+    if (isNaN(salePrice) || salePrice < 0) {
+      errorToast('Valid sale price is required');
+      return;
+    }
+    if (isNaN(stock) || stock < 0) {
+      errorToast('Valid stock quantity is required');
       return;
     }
 
     const id = (document.getElementById('medicineId') as HTMLInputElement).value;
-    const medicineData = {
-      name: (document.getElementById('medicineName') as HTMLInputElement).value,
-      generic: (document.getElementById('genericName') as HTMLInputElement).value,
-      category: (document.getElementById('medicineCategory') as HTMLSelectElement).value,
-      manufacturer: (document.getElementById('medicineManufacturer') as HTMLSelectElement).value,
-      unit: (document.getElementById('medicineUnit') as HTMLSelectElement).value,
-      batch: (document.getElementById('batchNumber') as HTMLInputElement).value,
-      expiry: (document.getElementById('expiryDate') as HTMLInputElement).value,
-      barcode: (document.getElementById('barcode') as HTMLInputElement).value,
-      purchasePrice: parseFloat((document.getElementById('purchasePrice') as HTMLInputElement).value),
-      salePrice: parseFloat((document.getElementById('salePrice') as HTMLInputElement).value),
-      stock: parseInt((document.getElementById('initialStock') as HTMLInputElement).value),
-      reorderLevel: parseInt((document.getElementById('reorderLevel') as HTMLInputElement).value),
-      description: (document.getElementById('medicineDescription') as HTMLTextAreaElement).value,
+    const categoryId = (document.getElementById('medicineCategory') as HTMLSelectElement).value;
+    const manufacturerId = (document.getElementById('medicineManufacturer') as HTMLSelectElement).value;
+    const unitId = (document.getElementById('medicineUnit') as HTMLSelectElement).value;
+
+    const medicinePayload = {
+      name: (document.getElementById('medicineName') as HTMLInputElement).value.trim(),
+      generic_name: (document.getElementById('genericName') as HTMLInputElement).value || undefined,
+      category_id: categoryId ? parseInt(categoryId) : undefined,
+      manufacturer_id: manufacturerId ? parseInt(manufacturerId) : undefined,
+      unit_id: unitId ? parseInt(unitId) : undefined,
+      barcode: (document.getElementById('barcode') as HTMLInputElement).value.trim() || undefined,
+      description: (document.getElementById('medicineDescription') as HTMLTextAreaElement).value || undefined,
+      reorder_level: parseInt((document.getElementById('reorderLevel') as HTMLInputElement).value) || 10,
     };
 
     try {
+      let medicineId: number;
       if (id) {
-        medicineStore.update(parseInt(id), medicineData);
+        const updated = await medicineService.update(parseInt(id), medicinePayload);
+        medicineId = updated.id;
       } else {
-        medicineStore.add(medicineData);
+        const created = await medicineService.create(medicinePayload);
+        medicineId = created.id;
       }
-      successToast('Medicine saved successfully!');
-    } catch (e) {
-      errorToast('Failed to save medicine.');
-    }
 
-    closeModal();
-    filterMedicines();
+      if (batchNumber && expiryDate && !isNaN(purchasePrice) && !isNaN(salePrice) && stock > 0) {
+        try {
+          await medicineService.createBatch(medicineId, {
+            batch_number: batchNumber,
+            expiry_date: expiryDate,
+            purchase_price: purchasePrice,
+            sale_price: salePrice,
+            quantity: stock,
+          });
+        } catch (batchErr) {
+          console.warn('Batch creation failed (non-fatal):', batchErr);
+        }
+      }
+
+      successToast(id ? 'Medicine updated successfully!' : 'Medicine added successfully!');
+      closeModal();
+      await loadMedicines();
+    } catch (e: any) {
+      console.error('Save medicine error:', e);
+      const msg = e?.response?.data?.message || e?.message || 'Failed to save medicine. Please try again.';
+      errorToast(msg);
+    }
   }
 
   // Event listeners

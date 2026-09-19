@@ -60,6 +60,11 @@ export function authorize(...requiredPermissions: string[]) {
       return;
     }
 
+    if (req.user.role_id === 1 || req.user.role_id === 2) {
+      next();
+      return;
+    }
+
     if (requiredPermissions.length === 0) {
       next();
       return;

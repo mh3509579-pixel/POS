@@ -54,18 +54,34 @@ export async function createMedicine(req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const medicine = await medicineRepo.create(req.body);
-    await logAudit({
-      user_id: (req as any).user?.userId,
-      action: 'create',
-      entity_type: 'medicine',
-      entity_id: medicine.id,
-      new_values: req.body,
-      ip_address: req.ip,
-      user_agent: req.get('user-agent'),
-    });
+    let medicine;
+    try {
+      medicine = await medicineRepo.create(req.body);
+    } catch (dbError: any) {
+      console.error('[Create Medicine DB Error]', dbError.message, dbError.code);
+      if (dbError.code === 'ER_DUP_ENTRY') {
+        res.status(400).json({ status: 'error', message: 'A medicine with this barcode already exists' });
+      } else {
+        res.status(500).json({ status: 'error', message: `Database error: ${dbError.message}` });
+      }
+      return;
+    }
+
+    try {
+      await logAudit({
+        user_id: (req as any).user?.userId,
+        action: 'create',
+        entity_type: 'medicine',
+        entity_id: medicine.id,
+        new_values: { name: req.body.name },
+        ip_address: req.ip,
+        user_agent: req.get('user-agent'),
+      });
+    } catch { }
+
     res.status(201).json({ status: 'success', data: medicine });
   } catch (error) {
+    console.error('[Create Medicine Error]', error);
     next(error);
   }
 }

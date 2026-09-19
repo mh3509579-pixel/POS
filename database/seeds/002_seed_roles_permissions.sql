@@ -92,6 +92,10 @@ INSERT INTO permissions (name, module, action) VALUES
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT 1, id FROM permissions;
 
+-- Super Admin gets all permissions
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 1, id FROM permissions;
+
 -- Admin gets all permissions
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT 2, id FROM permissions;

@@ -14,9 +14,7 @@ export function errorHandler(
   const statusCode = err.statusCode || 500;
   const message = err.isOperational ? err.message : 'Internal server error';
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.error('[API Error]', err);
-  }
+  console.error('[API Error]', statusCode, err.message, err.stack);
 
   res.status(statusCode).json({
     status: 'error',

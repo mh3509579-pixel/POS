@@ -5,8 +5,11 @@ export interface Medicine {
   name: string;
   generic: string;
   category: string;
+  category_id: number | null;
   manufacturer: string;
+  manufacturer_id: number | null;
   unit: string;
+  unit_id: number | null;
   batch: string;
   expiry: string;
   barcode: string;
@@ -33,8 +36,11 @@ class MedicineStore {
         name: m.name,
         generic: m.generic_name || '',
         category: m.category_name || '',
+        category_id: m.category_id ?? null,
         manufacturer: m.manufacturer_name || '',
+        manufacturer_id: m.manufacturer_id ?? null,
         unit: m.unit_name || '',
+        unit_id: m.unit_id ?? null,
         batch: m.batches?.[0]?.batch_number || '',
         expiry: m.batches?.[0]?.expiry_date || '',
         barcode: m.barcode || '',
@@ -159,9 +165,9 @@ class MedicineStore {
 export const medicineStore = new MedicineStore();
 
 const DEMO_MEDICINES: Medicine[] = [
-  { id: 1, name: 'Panadol', generic: 'Paracetamol', category: 'Analgesic', manufacturer: 'GSK', unit: 'Tablet', batch: 'B001', expiry: '2027-12-31', barcode: '8901234567890', purchasePrice: 5, salePrice: 10, stock: 500, reorderLevel: 100, description: 'Pain reliever' },
-  { id: 2, name: 'Amoxicillin', generic: 'Amoxicillin', category: 'Antibiotic', manufacturer: 'Sandoz', unit: 'Capsule', batch: 'B002', expiry: '2027-06-30', barcode: '8901234567891', purchasePrice: 15, salePrice: 25, stock: 300, reorderLevel: 50, description: 'Antibiotic' },
-  { id: 3, name: 'Nexium', generic: 'Esomeprazole', category: 'Antacid', manufacturer: 'AstraZeneca', unit: 'Tablet', batch: 'B003', expiry: '2027-09-30', barcode: '8901234567892', purchasePrice: 30, salePrice: 50, stock: 200, reorderLevel: 30, description: 'Acid reflux' },
-  { id: 4, name: 'Ventolin', generic: 'Salbutamol', category: 'Respiratory', manufacturer: 'GSK', unit: 'Inhaler', batch: 'B004', expiry: '2027-03-31', barcode: '8901234567893', purchasePrice: 150, salePrice: 250, stock: 50, reorderLevel: 10, description: 'Asthma inhaler' },
-  { id: 5, name: 'Lipitor', generic: 'Atorvastatin', category: 'Cardiovascular', manufacturer: 'Pfizer', unit: 'Tablet', batch: 'B005', expiry: '2027-11-30', barcode: '8901234567894', purchasePrice: 40, salePrice: 70, stock: 150, reorderLevel: 25, description: 'Cholesterol' },
+  { id: 1, name: 'Panadol', generic: 'Paracetamol', category: 'Analgesic', category_id: null, manufacturer: 'GSK', manufacturer_id: null, unit: 'Tablet', unit_id: null, batch: 'B001', expiry: '2027-12-31', barcode: '8901234567890', purchasePrice: 5, salePrice: 10, stock: 500, reorderLevel: 100, description: 'Pain reliever' },
+  { id: 2, name: 'Amoxicillin', generic: 'Amoxicillin', category: 'Antibiotic', category_id: null, manufacturer: 'Sandoz', manufacturer_id: null, unit: 'Capsule', unit_id: null, batch: 'B002', expiry: '2027-06-30', barcode: '8901234567891', purchasePrice: 15, salePrice: 25, stock: 300, reorderLevel: 50, description: 'Antibiotic' },
+  { id: 3, name: 'Nexium', generic: 'Esomeprazole', category: 'Antacid', category_id: null, manufacturer: 'AstraZeneca', manufacturer_id: null, unit: 'Tablet', unit_id: null, batch: 'B003', expiry: '2027-09-30', barcode: '8901234567892', purchasePrice: 30, salePrice: 50, stock: 200, reorderLevel: 30, description: 'Acid reflux' },
+  { id: 4, name: 'Ventolin', generic: 'Salbutamol', category: 'Respiratory', category_id: null, manufacturer: 'GSK', manufacturer_id: null, unit: 'Inhaler', unit_id: null, batch: 'B004', expiry: '2027-03-31', barcode: '8901234567893', purchasePrice: 150, salePrice: 250, stock: 50, reorderLevel: 10, description: 'Asthma inhaler' },
+  { id: 5, name: 'Lipitor', generic: 'Atorvastatin', category: 'Cardiovascular', category_id: null, manufacturer: 'Pfizer', manufacturer_id: null, unit: 'Tablet', unit_id: null, batch: 'B005', expiry: '2027-11-30', barcode: '8901234567894', purchasePrice: 40, salePrice: 70, stock: 150, reorderLevel: 25, description: 'Cholesterol' },
 ];
