@@ -2,11 +2,12 @@
 
 interface ImportMetaEnv {
   /**
-   * Base URL of the Express API.
+   * Optional absolute origin of the Express API.
    *
-   * Must be an absolute URL in production: the app is served from Vercel while
-   * the API runs elsewhere, so the default `/api` would resolve to the Vercel
-   * deployment itself and every request would 404.
+   * The Vercel rewrite in apps/web/vercel.json already proxies `/api/*` to the
+   * deployed API, so the default relative `/api` works on Vercel. This override
+   * exists only for pointing the client at a different API host without a code
+   * change.
    */
   readonly VITE_API_URL?: string;
 }
