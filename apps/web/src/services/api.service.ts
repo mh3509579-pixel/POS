@@ -1,7 +1,16 @@
 import axios from 'axios';
 
+/**
+ * In development the Vite dev server proxies `/api` to the local Express server
+ * (see vite.config.ts), so the relative default works. In production the app is
+ * hosted on Vercel while the API runs on a separate host, so a relative `/api`
+ * would target the Vercel deployment and 404 on every call. Set VITE_API_URL to
+ * the API's absolute origin.
+ */
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
