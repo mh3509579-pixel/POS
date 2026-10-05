@@ -38,22 +38,7 @@ class AuthService {
   }
 
   async login(data: LoginPayload): Promise<LoginResponse> {
-    try {
-      const response = await api.post<{ status: string; data: LoginResponse }>('/auth/login', data);
-      const result = response.data.data;
-      this.saveAuth(result);
-      return result;
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status === 401 || status === 400 || status === 500 || status === 404 || error?.code === 'ERR_NETWORK') {
-        return this.demoLogin(data);
-      }
-      throw error;
-    }
-  }
-
-  async demoLogin(data: LoginPayload): Promise<LoginResponse> {
-    const response = await api.post<{ status: string; data: LoginResponse }>('/demo/demo-login', data);
+    const response = await api.post<{ status: string; data: LoginResponse }>('/auth/login', data);
     const result = response.data.data;
     this.saveAuth(result);
     return result;

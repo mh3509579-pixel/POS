@@ -4,6 +4,12 @@ import { UserRepository } from '../infrastructure/user.repository.js';
 import { LoginDTO, LoginResponse, CreateUserDTO, UserWithRole } from '../domain/user.entity.js';
 import { env } from '../../../infrastructure/config/env.js';
 
+/** Every authentication failure returns this identical message. */
+const GENERIC_LOGIN_ERROR = 'Invalid username or password';
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MINUTES = 30;
+
 export class AuthService {
   private userRepo: UserRepository;
 
@@ -18,37 +24,39 @@ export class AuthService {
       user = await this.userRepo.findByEmail(data.username);
     }
 
+    // A distinct "no such user" message would let an attacker enumerate valid
+    // usernames, so every failure path below returns the same generic error.
     if (!user) {
-      throw new Error('Invalid username or password');
+      throw new Error(GENERIC_LOGIN_ERROR);
     }
 
-    if (!user.is_active) {
-      throw new Error('Account is deactivated. Contact administrator.');
-    }
-
-    if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      throw new Error('Account is locked. Try again later.');
-    }
+    const isActive = Boolean(user.is_active);
+    const isLocked = Boolean(user.locked_until) && new Date(user.locked_until as unknown as string) > new Date();
 
     const isValidPassword = await bcrypt.compare(data.password, user.password_hash);
 
-    if (!isValidPassword) {
-      await this.userRepo.incrementFailedLogin(user.id);
+    if (!isValidPassword || !isActive || isLocked) {
+      if (!isValidPassword) {
+        // Compare against the post-increment count: reading the column before
+        // incrementing locked the account on the 5th failure, not the 4th.
+        const attempts = Number(user.failed_login_attempts ?? 0) + 1;
 
-      if (user.failed_login_attempts >= 4) {
-        await this.userRepo.lockUser(user.id, 30);
-        throw new Error('Account locked due to too many failed attempts. Try again in 30 minutes.');
+        if (attempts >= MAX_FAILED_ATTEMPTS && !isLocked) {
+          await this.userRepo.lockUser(user.id, LOCK_MINUTES);
+        } else {
+          await this.userRepo.incrementFailedLogin(user.id);
+        }
       }
 
-      throw new Error('Invalid username or password');
+      throw new Error(GENERIC_LOGIN_ERROR);
     }
 
     await this.userRepo.updateLastLogin(user.id);
 
     const token = jwt.sign(
       { userId: user.id, username: user.username, role_id: user.role_id },
-      env.JWT_SECRET as string,
-      { expiresIn: '24h' }
+      env.JWT_SECRET,
+      { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'], algorithm: 'HS256' }
     );
 
     const role = await this.userRepo.findRoleById(user.role_id);
@@ -104,7 +112,7 @@ export class AuthService {
     return this.userRepo.updatePassword(userId, hash);
   }
 
-  async verifyToken(token: string): Promise<any> {
-    return jwt.verify(token, env.JWT_SECRET);
+  async verifyToken(token: string): Promise<jwt.JwtPayload> {
+    return jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
   }
 }

@@ -86,15 +86,44 @@ export class UserRepository {
     return result.affectedRows > 0;
   }
 
+  async setActive(id: number, isActive: boolean): Promise<boolean> {
+    const result = await execute('UPDATE users SET is_active = ? WHERE id = ?', [isActive, id]);
+    return result.affectedRows > 0;
+  }
+
+  /** Counts active users holding `roleId`, ignoring one account. */
+  async countActiveWithRoleExcluding(roleId: number, excludeUserId: number): Promise<number> {
+    const result = await queryOne<{ count: number }>(
+      'SELECT COUNT(*) as count FROM users WHERE role_id = ? AND is_active = TRUE AND id <> ?',
+      [roleId, excludeUserId]
+    );
+    return Number(result?.count ?? 0);
+  }
+
   async getUserPermissions(userId: number): Promise<string[]> {
     const permissions = await query<{ name: string }[]>(
-      `SELECT p.name FROM permissions p
+      `SELECT DISTINCT p.name FROM permissions p
        INNER JOIN role_permissions rp ON p.id = rp.permission_id
        INNER JOIN users u ON rp.role_id = u.role_id
-       WHERE u.id = ?`,
+       WHERE u.id = ? AND u.is_active = TRUE
+         AND (u.locked_until IS NULL OR u.locked_until < NOW())`,
       [userId]
     );
     return permissions.map((p) => p.name);
+  }
+
+  /**
+   * Minimal projection used by the auth middleware on every request.
+   * Returns null when the account is missing, deactivated, or locked, so a
+   * token for a disabled/deleted account stops working immediately instead of
+   * remaining valid for the full token lifetime.
+   */
+  async findActiveAuthContext(userId: number): Promise<{ id: number; username: string; role_id: number } | null> {
+    return queryOne<{ id: number; username: string; role_id: number }>(
+      `SELECT id, username, role_id FROM users
+       WHERE id = ? AND is_active = TRUE AND (locked_until IS NULL OR locked_until < NOW())`,
+      [userId]
+    );
   }
 
   // Role methods

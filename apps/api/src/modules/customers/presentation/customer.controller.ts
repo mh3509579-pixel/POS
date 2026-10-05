@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomerRepository } from '../infrastructure/customer.repository.js';
 import { logAudit } from '../../../infrastructure/utils/audit-logger.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const customerRepo = new CustomerRepository();
 
 export async function getAllCustomers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 100;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const search = req.query.search as string | undefined;
     const type = req.query.type as string | undefined;
 
@@ -43,7 +43,7 @@ export async function createCustomer(req: Request, res: Response, next: NextFunc
 
     const customer = await customerRepo.create(req.body);
     await logAudit({
-      user_id: (req as any).user?.userId,
+      user_id: requireUserId(req as any),
       action: 'create',
       entity_type: 'customer',
       entity_id: customer.id,
@@ -66,7 +66,7 @@ export async function updateCustomer(req: Request, res: Response, next: NextFunc
       return;
     }
     await logAudit({
-      user_id: (req as any).user?.userId,
+      user_id: requireUserId(req as any),
       action: 'update',
       entity_type: 'customer',
       entity_id: customer.id,
@@ -90,7 +90,7 @@ export async function deleteCustomer(req: Request, res: Response, next: NextFunc
       return;
     }
     await logAudit({
-      user_id: (req as any).user?.userId,
+      user_id: requireUserId(req as any),
       action: 'delete',
       entity_type: 'customer',
       entity_id: parseInt(req.params.id),
@@ -106,7 +106,7 @@ export async function deleteCustomer(req: Request, res: Response, next: NextFunc
 
 export async function getTopCustomers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const { limit } = parsePagination(req.query.limit, undefined, { limit: 10 });
     const customers = await customerRepo.getTopCustomers(limit);
     res.json({ status: 'success', data: customers });
   } catch (error) {

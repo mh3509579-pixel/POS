@@ -1,14 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { NotificationRepository } from '../infrastructure/notification.repository.js';
 import { AuthRequest } from '../../../infrastructure/middleware/auth.middleware.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const notificationRepo = new NotificationRepository();
 
 export async function getNotifications(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = req.user?.userId || 0;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const userId = requireUserId(req as any);
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
 
     const notifications = await notificationRepo.findByUserId(userId, limit, offset);
     const unreadCount = await notificationRepo.countUnread(userId);
@@ -35,7 +35,7 @@ export async function markAsRead(req: AuthRequest, res: Response, next: NextFunc
 
 export async function markAllAsRead(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = req.user?.userId || 0;
+    const userId = requireUserId(req as any);
     await notificationRepo.markAllAsRead(userId);
     res.json({ status: 'success', message: 'All notifications marked as read' });
   } catch (error) {

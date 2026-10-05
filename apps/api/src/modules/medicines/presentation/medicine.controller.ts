@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { MedicineRepository } from '../infrastructure/medicine.repository.js';
 import { logAudit } from '../../../infrastructure/utils/audit-logger.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const medicineRepo = new MedicineRepository();
 
 export async function getAllMedicines(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 100;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const search = req.query.search as string | undefined;
     const categoryId = req.query.category_id ? parseInt(req.query.category_id as string) : undefined;
 
@@ -73,7 +73,7 @@ export async function createMedicine(req: Request, res: Response, next: NextFunc
 
     try {
       await logAudit({
-        user_id: (req as any).user?.userId,
+        user_id: requireUserId(req as any),
         action: 'create',
         entity_type: 'medicine',
         entity_id: medicine.id,
@@ -81,7 +81,9 @@ export async function createMedicine(req: Request, res: Response, next: NextFunc
         ip_address: req.ip,
         user_agent: req.get('user-agent'),
       });
-    } catch { }
+    } catch (auditError) {
+      console.warn('[Create Medicine] audit log failed:', auditError);
+    }
 
     res.status(201).json({ status: 'success', data: medicine });
   } catch (error) {
@@ -99,7 +101,7 @@ export async function updateMedicine(req: Request, res: Response, next: NextFunc
       return;
     }
     await logAudit({
-      user_id: (req as any).user?.userId,
+      user_id: requireUserId(req as any),
       action: 'update',
       entity_type: 'medicine',
       entity_id: medicine.id,
@@ -123,7 +125,7 @@ export async function deleteMedicine(req: Request, res: Response, next: NextFunc
       return;
     }
     await logAudit({
-      user_id: (req as any).user?.userId,
+      user_id: requireUserId(req as any),
       action: 'delete',
       entity_type: 'medicine',
       entity_id: parseInt(req.params.id),

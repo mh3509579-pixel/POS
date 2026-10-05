@@ -8,19 +8,24 @@ import {
   query,
   queryOne,
   execute,
-  beginTransaction,
-  commitTransaction,
-  rollbackTransaction,
+  withTransaction,
+  TransactionContext,
 } from '../../../infrastructure/database/connection.js';
+import { round2, ValidationError, ConflictError } from '../domain/sale.rules.js';
 
 export class SaleReturnRepository {
-  async generateReturnNumber(): Promise<string> {
+  async generateReturnNumber(tx?: TransactionContext): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `RET-SALE-${year}-`;
-    const last = await queryOne<{ return_number: string }>(
-      "SELECT return_number FROM sale_returns WHERE return_number LIKE ? ORDER BY id DESC LIMIT 1",
-      [`${prefix}%`]
-    );
+    const last = tx
+      ? await tx.queryOne<{ return_number: string }>(
+          "SELECT return_number FROM sale_returns WHERE return_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE",
+          [`${prefix}%`]
+        )
+      : await queryOne<{ return_number: string }>(
+          "SELECT return_number FROM sale_returns WHERE return_number LIKE ? ORDER BY id DESC LIMIT 1",
+          [`${prefix}%`]
+        );
 
     if (!last) {
       return `${prefix}000001`;
@@ -34,23 +39,103 @@ export class SaleReturnRepository {
     data: CreateSaleReturnDTO,
     userId: number
   ): Promise<SaleReturnWithItems> {
-    const connection = await beginTransaction();
-
-    try {
-      const returnNumber = await this.generateReturnNumber();
-
-      const subtotal = data.items.reduce(
-        (sum, item) => sum + item.unit_price * item.quantity,
-        0
+    const saleReturn = await withTransaction(async (tx) => {
+      const sale = await tx.queryOne<{ id: number; customer_id: number | null; status: string }>(
+        'SELECT id, customer_id, status FROM sales WHERE id = ? FOR UPDATE',
+        [data.sale_id]
       );
 
-      const saleResult = await execute(
+      if (!sale) {
+        throw new ValidationError(`Sale ${data.sale_id} not found`);
+      }
+
+      if (sale.status === 'voided') {
+        throw new ConflictError('A voided sale cannot be returned');
+      }
+
+      const returnNumber = await this.generateReturnNumber(tx);
+
+      // Resolve every line against the real sale_items row. medicine_id,
+      // batch_id and unit_price are never taken from the client.
+      interface ResolvedLine {
+        sale_item_id: number;
+        medicine_id: number;
+        batch_id: number;
+        quantity: number;
+        unit_price: number;
+        total: number;
+      }
+
+      const resolved: ResolvedLine[] = [];
+      const seen = new Map<number, number>();
+
+      for (const [index, raw] of data.items.entries()) {
+        const saleItemId = Number(raw?.sale_item_id);
+        if (!Number.isInteger(saleItemId) || saleItemId <= 0) {
+          throw new ValidationError(`items[${index}].sale_item_id must be a positive integer`);
+        }
+
+        const quantity = Number(raw?.quantity);
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw new ValidationError(`items[${index}].quantity must be a whole number greater than zero`);
+        }
+
+        const saleItem = await tx.queryOne<{
+          id: number;
+          medicine_id: number;
+          batch_id: number;
+          quantity: number;
+          unit_price: string | number;
+        }>(
+          'SELECT id, medicine_id, batch_id, quantity, unit_price FROM sale_items WHERE id = ? AND sale_id = ? FOR UPDATE',
+          [saleItemId, data.sale_id]
+        );
+
+        if (!saleItem) {
+          throw new ValidationError(`Sale item ${saleItemId} does not belong to sale ${data.sale_id}`);
+        }
+
+        const previouslyReturned = await tx.queryOne<{ returned: number }>(
+          `SELECT COALESCE(SUM(sri.quantity), 0) as returned
+           FROM sale_return_items sri
+           JOIN sale_returns sr ON sri.sale_return_id = sr.id
+           WHERE sri.sale_item_id = ? AND sr.status = 'completed'`,
+          [saleItemId]
+        );
+
+        const alreadyThisRequest = seen.get(saleItemId) ?? 0;
+        const returnedSoFar = Number(previouslyReturned?.returned ?? 0) + alreadyThisRequest;
+        const sold = Number(saleItem.quantity);
+
+        if (returnedSoFar + quantity > sold) {
+          throw new ConflictError(
+            `Cannot return ${quantity} of sale item ${saleItemId}: only ${sold - returnedSoFar} of ${sold} remain returnable`
+          );
+        }
+
+        seen.set(saleItemId, alreadyThisRequest + quantity);
+
+        const unitPrice = Number(saleItem.unit_price ?? 0);
+
+        resolved.push({
+          sale_item_id: saleItem.id,
+          medicine_id: saleItem.medicine_id,
+          batch_id: saleItem.batch_id,
+          quantity,
+          unit_price: unitPrice,
+          total: round2(unitPrice * quantity),
+        });
+      }
+
+      const subtotal = round2(resolved.reduce((sum, line) => sum + line.total, 0));
+
+      const saleReturnResult = await tx.execute(
         `INSERT INTO sale_returns (return_number, sale_id, customer_id, user_id, subtotal, total_amount, refund_method, reason, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'completed')`,
         [
           returnNumber,
           data.sale_id,
-          data.customer_id || null,
+          data.customer_id ?? sale.customer_id ?? null,
           userId,
           subtotal,
           subtotal,
@@ -59,76 +144,63 @@ export class SaleReturnRepository {
         ]
       );
 
-      const saleReturnId = saleResult.insertId;
+      const saleReturnId = saleReturnResult.insertId;
 
-      for (const item of data.items) {
-        const itemTotal = item.unit_price * item.quantity;
-
-        await execute(
+      for (const line of resolved) {
+        await tx.execute(
           `INSERT INTO sale_return_items (sale_return_id, sale_item_id, medicine_id, batch_id, quantity, unit_price, total)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             saleReturnId,
-            item.sale_item_id,
-            item.medicine_id,
-            item.batch_id || null,
-            item.quantity,
-            item.unit_price,
-            itemTotal,
+            line.sale_item_id,
+            line.medicine_id,
+            line.batch_id,
+            line.quantity,
+            line.unit_price,
+            line.total,
           ]
         );
 
-        if (item.batch_id) {
-          await execute(
-            'UPDATE medicine_batches SET quantity = quantity + ? WHERE id = ?',
-            [item.quantity, item.batch_id]
-          );
+        await tx.execute('UPDATE medicine_batches SET quantity = quantity + ? WHERE id = ?', [
+          line.quantity,
+          line.batch_id,
+        ]);
 
-          await execute(
-            `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
-             VALUES (?, ?, 'sale_return', ?, 'sale_return', ?, ?, ?)`,
-            [
-              item.medicine_id,
-              item.batch_id,
-              item.quantity,
-              saleReturnId,
-              userId,
-              `Return #${returnNumber}`,
-            ]
-          );
-        }
-      }
-
-      const allItemsReturned = await this.checkAllItemsReturned(
-        data.sale_id
-      );
-      if (allItemsReturned) {
-        await execute(
-          "UPDATE sales SET status = 'returned' WHERE id = ?",
-          [data.sale_id]
+        await tx.execute(
+          `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
+           VALUES (?, ?, 'sale_return', ?, 'sale_return', ?, ?, ?)`,
+          [
+            line.medicine_id,
+            line.batch_id,
+            line.quantity,
+            saleReturnId,
+            userId,
+            `Return #${returnNumber}`,
+          ]
         );
       }
 
-      await commitTransaction(connection);
+      if (await this.checkAllItemsReturned(tx, data.sale_id)) {
+        await tx.execute("UPDATE sales SET status = 'returned' WHERE id = ?", [data.sale_id]);
+      }
 
-      return (await this.findById(saleReturnId)) as SaleReturnWithItems;
-    } catch (error) {
-      await rollbackTransaction(connection);
-      throw error;
-    }
+      return { saleReturnId, returnNumber };
+    });
+
+    return (await this.findById(saleReturn.saleReturnId)) as SaleReturnWithItems;
   }
 
-  private async checkAllItemsReturned(saleId: number): Promise<boolean> {
-    const result = await queryOne<{ total: number; returned: number }>(
+  private async checkAllItemsReturned(tx: TransactionContext, saleId: number): Promise<boolean> {
+    const result = await tx.queryOne<{ total: number; returned: number }>(
       `SELECT
          (SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si WHERE si.sale_id = ?) as total,
          (SELECT COALESCE(SUM(sri.quantity), 0) FROM sale_return_items sri
           JOIN sale_returns sr ON sri.sale_return_id = sr.id
-          WHERE sr.sale_id = ? AND sr.status != 'rejected') as returned`,
+          WHERE sr.sale_id = ? AND sr.status = 'completed') as returned`,
       [saleId, saleId]
     );
     if (!result) return false;
-    return result.total > 0 && result.total <= result.returned;
+    return Number(result.total) > 0 && Number(result.total) <= Number(result.returned);
   }
 
   async findById(id: number): Promise<SaleReturnWithItems | null> {

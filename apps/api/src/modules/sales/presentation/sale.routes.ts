@@ -13,23 +13,23 @@ import {
   getSaleReturnById,
   getSaleReturnsBySaleId,
 } from './sale-return.controller.js';
-import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
+import { authenticate, authorize } from '../../../infrastructure/middleware/auth.middleware.js';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.post('/sales', createSale);
-router.get('/sales', getAllSales);
-router.get('/sales/daily', getDailySales);
-router.get('/sales/summary', getSalesSummary);
-router.get('/sales/invoice/:invoiceNumber', getSaleByInvoice);
+router.post('/sales', authorize('sales.create', 'pos.sale.create'), createSale);
+router.get('/sales', authorize('sales.view'), getAllSales);
+router.get('/sales/daily', authorize('sales.view'), getDailySales);
+router.get('/sales/summary', authorize('sales.view'), getSalesSummary);
+router.get('/sales/invoice/:invoiceNumber', authorize('sales.view'), getSaleByInvoice);
 
-router.post('/sales/returns', createSaleReturn);
-router.get('/sales/returns', getAllSaleReturns);
-router.get('/sales/returns/sale/:saleId', getSaleReturnsBySaleId);
-router.get('/sales/returns/:id', getSaleReturnById);
+router.post('/sales/returns', authorize('sales.return.create', 'pos.return.create'), createSaleReturn);
+router.get('/sales/returns', authorize('sales.view'), getAllSaleReturns);
+router.get('/sales/returns/sale/:saleId', authorize('sales.view'), getSaleReturnsBySaleId);
+router.get('/sales/returns/:id', authorize('sales.view'), getSaleReturnById);
 
-router.get('/sales/:id', getSaleById);
+router.get('/sales/:id', authorize('sales.view'), getSaleById);
 
 export { router as salesRoutes };

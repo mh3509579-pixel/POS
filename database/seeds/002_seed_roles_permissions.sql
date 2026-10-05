@@ -82,8 +82,10 @@ INSERT INTO permissions (name, module, action) VALUES
   ('settings.update', 'settings', 'update'),
 
   -- Backup
+  ('backup.view', 'backup', 'view'),
   ('backup.create', 'backup', 'create'),
   ('backup.restore', 'backup', 'restore'),
+  ('backup.delete', 'backup', 'delete'),
 
   -- Audit
   ('audit.view', 'audit', 'view');

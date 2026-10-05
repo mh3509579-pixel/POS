@@ -1,17 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import { PurchaseReturnRepository } from '../infrastructure/purchase-return.repository.js';
 import { PurchaseRepository } from '../infrastructure/purchase.repository.js';
+import { VALID_REFUND_METHODS, RefundMethod } from '../domain/purchase-return.entity.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const purchaseReturnRepo = new PurchaseReturnRepository();
 const purchaseRepo = new PurchaseRepository();
 
 export async function createPurchaseReturn(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = (req as any).user?.userId || 1;
+    const userId = requireUserId(req as any);
     const { purchase_id, supplier_id, items, refund_method, reason } = req.body;
 
-    if (!purchase_id || !items || !items.length || !refund_method) {
+    if (!purchase_id || !Array.isArray(items) || !items.length || !refund_method) {
       res.status(400).json({ status: 'error', message: 'purchase_id, items, and refund_method are required' });
+      return;
+    }
+
+    if (!VALID_REFUND_METHODS.includes(refund_method as RefundMethod)) {
+      res.status(400).json({
+        status: 'error',
+        message: `refund_method must be one of: ${VALID_REFUND_METHODS.join(', ')}`,
+      });
       return;
     }
 
@@ -27,13 +37,22 @@ export async function createPurchaseReturn(req: Request, res: Response, next: Ne
         res.status(400).json({ status: 'error', message: `Purchase item ${item.purchase_item_id} not found in purchase` });
         return;
       }
-      if (item.quantity > purchaseItem.quantity) {
-        res.status(400).json({ status: 'error', message: `Return quantity ${item.quantity} exceeds original quantity ${purchaseItem.quantity} for item ${item.purchase_item_id}` });
-        return;
-      }
     }
 
-    const purchaseReturn = await purchaseReturnRepo.create({ purchase_id, supplier_id: supplier_id ?? purchase.supplier_id, items, refund_method, reason }, userId);
+    const purchaseReturn = await purchaseReturnRepo.create(
+      {
+        purchase_id,
+        supplier_id: supplier_id ?? purchase.supplier_id,
+        items: items.map((item: any) => ({
+          purchase_item_id: item.purchase_item_id,
+          quantity: item.quantity,
+        })),
+        refund_method,
+        reason,
+      },
+      userId
+    );
+
     res.status(201).json({ status: 'success', data: purchaseReturn });
   } catch (error) {
     next(error);
@@ -42,8 +61,7 @@ export async function createPurchaseReturn(req: Request, res: Response, next: Ne
 
 export async function getAllPurchaseReturns(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const returns = await purchaseReturnRepo.findAll(limit, offset);
     res.json({ status: 'success', data: returns });
   } catch (error) {

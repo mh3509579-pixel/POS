@@ -3,6 +3,7 @@ import { IAccountingService } from '../domain/accounting.service.js';
 import { IJournalEntryRepository } from '../domain/journal-entry.repository.js';
 import { IGeneralLedgerRepository } from '../domain/general-ledger.repository.js';
 import { IAccountRepository } from '../domain/account.repository.js';
+import { round2 } from '../../sales/domain/sale.rules.js';
 
 export class AccountingService implements IAccountingService {
   constructor(
@@ -12,23 +13,37 @@ export class AccountingService implements IAccountingService {
   ) {}
 
   async createJournalEntry(data: CreateJournalEntryDTO): Promise<JournalEntryWithLines> {
+    // MySQL DECIMAL columns are returned by mysql2 as strings. Coerce before any
+    // arithmetic, otherwise `sum + line.debit` concatenates (e.g. '0' + '100.00').
+    const lines = data.lines.map((line) => ({
+      ...line,
+      debit: round2(Number(line.debit) || 0),
+      credit: round2(Number(line.credit) || 0),
+    }));
+
+    if (lines.some((line) => line.debit < 0 || line.credit < 0)) {
+      throw new Error('Journal entry amounts cannot be negative');
+    }
+
     // Validate that debits equal credits
-    const totalDebit = data.lines.reduce((sum, line) => sum + line.debit, 0);
-    const totalCredit = data.lines.reduce((sum, line) => sum + line.credit, 0);
+    const totalDebit = round2(lines.reduce((sum, line) => sum + line.debit, 0));
+    const totalCredit = round2(lines.reduce((sum, line) => sum + line.credit, 0));
 
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      throw new Error('Total debits must equal total credits');
+      throw new Error(
+        `Total debits (${totalDebit}) must equal total credits (${totalCredit})`
+      );
     }
 
     // Validate accounts exist
-    for (const line of data.lines) {
+    for (const line of lines) {
       const account = await this.accountRepo.findById(line.account_id);
       if (!account) {
         throw new Error(`Account not found: ${line.account_id}`);
       }
     }
 
-    return this.journalEntryRepo.create(data);
+    return this.journalEntryRepo.create({ ...data, lines });
   }
 
   async postJournalEntry(id: number): Promise<JournalEntryWithLines> {
@@ -105,10 +120,16 @@ export class AccountingService implements IAccountingService {
     paymentMethod: string,
     lines: { account_id: number; debit: number; credit: number }[]
   ): Promise<JournalEntryWithLines> {
+    const value = round2(Number(amount) || 0);
+
+    if (value <= 0) {
+      throw new Error('Sale amount must be greater than zero');
+    }
+
     // Determine cash/bank account based on payment method
     let cashAccountCode = '1010'; // Cash in Hand
-    if (paymentMethod === 'card') {
-      cashAccountCode = '1020'; // Bank Account
+    if (paymentMethod === 'card' || paymentMethod === 'credit') {
+      cashAccountCode = '1020'; // Bank/Receivable
     }
 
     const cashAccount = await this.accountRepo.findByCode(cashAccountCode);
@@ -129,11 +150,15 @@ export class AccountingService implements IAccountingService {
       reference_id: saleId,
       lines: [
         // Debit: Cash/Bank
-        { account_id: cashAccount.id, debit: amount, credit: 0, description: `Cash received for sale #${saleId}` },
+        { account_id: cashAccount.id, debit: value, credit: 0, description: `Cash received for sale #${saleId}` },
         // Credit: Sales Revenue
-        { account_id: salesRevenueAccount.id, debit: 0, credit: amount, description: `Revenue from sale #${saleId}` },
+        { account_id: salesRevenueAccount.id, debit: 0, credit: value, description: `Revenue from sale #${saleId}` },
         // Add additional lines if provided (e.g., for inventory)
-        ...lines,
+        ...lines.map((line) => ({
+          account_id: line.account_id,
+          debit: round2(Number(line.debit) || 0),
+          credit: round2(Number(line.credit) || 0),
+        })),
       ],
     };
 
@@ -147,6 +172,12 @@ export class AccountingService implements IAccountingService {
     supplierId: number,
     lines: { account_id: number; debit: number; credit: number }[]
   ): Promise<JournalEntryWithLines> {
+    const value = round2(Number(amount) || 0);
+
+    if (value <= 0) {
+      throw new Error('Purchase amount must be greater than zero');
+    }
+
     const inventoryAccount = await this.accountRepo.findByCode('1040');
     if (!inventoryAccount) {
       throw new Error('Inventory account not found');
@@ -157,26 +188,26 @@ export class AccountingService implements IAccountingService {
       throw new Error('Accounts Payable account not found');
     }
 
-    const purchaseAccount = await this.accountRepo.findByCode('5010');
-    if (!purchaseAccount) {
-      throw new Error('Purchase account not found');
-    }
-
-    // Create journal entry
+    // Create journal entry.
+    // Purchased goods are capitalised into inventory (1040), so the entry is
+    // Dr Inventory / Cr Accounts Payable. Debiting a purchase-expense account
+    // as well double-counts the cost and leaves the entry unbalanced
+    // (debits = 2x amount, credits = amount), which made createJournalEntry
+    // throw *after* the purchase had already been committed.
     const entryData: CreateJournalEntryDTO = {
       entry_date: new Date(),
       description: `Purchase #${purchaseId} from Supplier #${supplierId}`,
       reference_type: 'purchase',
       reference_id: purchaseId,
       lines: [
-        // Debit: Inventory
-        { account_id: inventoryAccount.id, debit: amount, credit: 0, description: `Inventory received for purchase #${purchaseId}` },
-        // Debit: Purchase Expense
-        { account_id: purchaseAccount.id, debit: amount, credit: 0, description: `Cost of goods for purchase #${purchaseId}` },
-        // Credit: Accounts Payable
-        { account_id: accountsPayableAccount.id, debit: 0, credit: amount, description: `Amount owed to Supplier #${supplierId}` },
+        { account_id: inventoryAccount.id, debit: value, credit: 0, description: `Inventory received for purchase #${purchaseId}` },
+        { account_id: accountsPayableAccount.id, debit: 0, credit: value, description: `Amount owed to Supplier #${supplierId}` },
         // Add additional lines if provided
-        ...lines,
+        ...lines.map((line) => ({
+          account_id: line.account_id,
+          debit: round2(Number(line.debit) || 0),
+          credit: round2(Number(line.credit) || 0),
+        })),
       ],
     };
 
@@ -190,6 +221,12 @@ export class AccountingService implements IAccountingService {
     categoryId: number,
     lines: { account_id: number; debit: number; credit: number }[]
   ): Promise<JournalEntryWithLines> {
+    const value = round2(Number(amount) || 0);
+
+    if (value <= 0) {
+      throw new Error('Expense amount must be greater than zero');
+    }
+
     const cashAccount = await this.accountRepo.findByCode('1010');
     if (!cashAccount) {
       throw new Error('Cash account not found');
@@ -209,11 +246,15 @@ export class AccountingService implements IAccountingService {
       reference_id: expenseId,
       lines: [
         // Debit: Expense Account
-        { account_id: expenseAccount.id, debit: amount, credit: 0, description: `Expense: ${expenseAccount.name}` },
+        { account_id: expenseAccount.id, debit: value, credit: 0, description: `Expense: ${expenseAccount.name}` },
         // Credit: Cash
-        { account_id: cashAccount.id, debit: 0, credit: amount, description: `Cash paid for expense #${expenseId}` },
+        { account_id: cashAccount.id, debit: 0, credit: value, description: `Cash paid for expense #${expenseId}` },
         // Add additional lines if provided
-        ...lines,
+        ...lines.map((line) => ({
+          account_id: line.account_id,
+          debit: round2(Number(line.debit) || 0),
+          credit: round2(Number(line.credit) || 0),
+        })),
       ],
     };
 

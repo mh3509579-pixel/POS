@@ -3,7 +3,7 @@ import {
   MedicineBatch, CreateBatchDTO, UpdateBatchDTO,
   MedicineCategory, Manufacturer, MedicineUnit,
 } from '../domain/medicine.entity.js';
-import { query, queryOne, execute } from '../../../infrastructure/database/connection.js';
+import { query, queryOne, execute, withTransaction } from '../../../infrastructure/database/connection.js';
 
 export class MedicineRepository {
   // ===================== MEDICINES =====================
@@ -179,14 +179,65 @@ export class MedicineRepository {
   }
 
   async updateStock(medicineId: number, quantityChange: number): Promise<boolean> {
-    const batches = await this.findBatchesByMedicine(medicineId);
-    if (batches.length === 0) return false;
+    const change = Number(quantityChange);
 
-    if (quantityChange < 0) {
-      return this.reduceBatchStock(batches[0].id, Math.abs(quantityChange));
-    } else {
-      return this.increaseBatchStock(batches[0].id, quantityChange);
+    if (!Number.isFinite(change) || change === 0 || !Number.isInteger(change)) {
+      return false;
     }
+
+    // Increase always targets the longest-dated (last expiring) batch, which is
+    // the reverse of the FEFO order used for dispensing.
+    if (change > 0) {
+      const targets = await query<MedicineBatch[]>(
+        `SELECT * FROM medicine_batches
+         WHERE medicine_id = ? AND is_active = TRUE AND expiry_date >= CURDATE()
+         ORDER BY expiry_date DESC`,
+        [medicineId]
+      );
+
+      const target = targets[0];
+      if (!target) return false;
+
+      return this.increaseBatchStock(target.id, change);
+    }
+
+    const needed = Math.abs(change);
+
+    // A single batch may not hold the whole quantity, so walk FEFO batches and
+    // only apply the ones that actually have stock.
+    return withTransaction(async (tx) => {
+      const batches = await tx.query<MedicineBatch[]>(
+        `SELECT id, quantity FROM medicine_batches
+         WHERE medicine_id = ? AND is_active = TRUE AND expiry_date >= CURDATE() AND quantity > 0
+         ORDER BY expiry_date ASC
+         FOR UPDATE`,
+        [medicineId]
+      );
+
+      let remaining = needed;
+
+      for (const batch of batches) {
+        if (remaining <= 0) break;
+
+        const available = Number(batch.quantity);
+        const take = Math.min(available, remaining);
+
+        const result = await tx.execute(
+          'UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ? AND quantity >= ?',
+          [take, batch.id, take]
+        );
+
+        if (result.affectedRows > 0) {
+          remaining -= take;
+        }
+      }
+
+      if (remaining > 0) {
+        throw new Error(`Insufficient stock: only ${needed - remaining} of ${needed} units available`);
+      }
+
+      return true;
+    });
   }
 
   async getExpiringBatches(days: number = 90): Promise<(MedicineBatch & { medicine_name: string })[]> {

@@ -21,8 +21,9 @@ import { authenticate, authorize } from '../../../infrastructure/middleware/auth
 
 const router = Router();
 
-// POS search (no auth needed for quick lookup)
-router.get('/pos/search', searchForPOS);
+// POS search. This exposes batch numbers, expiry dates, purchase prices and
+// live stock, so it must never be reachable without a session.
+router.get('/pos/search', authenticate, authorize('pos.access', 'sales.view'), searchForPOS);
 
 // Static routes BEFORE /:id to avoid shadowing
 router.get('/low-stock', authenticate, authorize('medicines.view'), getLowStockMedicines);
@@ -42,7 +43,7 @@ router.put('/:id', authenticate, authorize('medicines.update'), updateMedicine);
 router.delete('/:id', authenticate, authorize('medicines.delete'), deleteMedicine);
 
 // Stock update
-router.post('/:id/stock-update', authenticate, updateStock);
+router.post('/:id/stock-update', authenticate, authorize('inventory.adjust'), updateStock);
 
 // Batch management
 router.get('/:id/batches', authenticate, authorize('medicines.view'), getMedicineBatches);

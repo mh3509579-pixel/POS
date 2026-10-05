@@ -8,9 +8,12 @@ export interface AuthRequest extends Request {
     userId: number;
     username: string;
     role_id: number;
-    permissions?: string[];
+    permissions: string[];
   };
 }
+
+/** Roles that bypass per-permission checks entirely. */
+const SUPER_ADMIN_ROLE_IDS = new Set([1, 2]);
 
 const userRepo = new UserRepository();
 
@@ -24,9 +27,13 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
 
   const token = authHeader.split(' ')[1];
 
-  let decoded: any;
+  let decoded: jwt.JwtPayload;
   try {
-    decoded = jwt.verify(token, env.JWT_SECRET);
+    // Pin the algorithm: without this an attacker can attempt algorithm
+    // confusion (e.g. `alg: none` or an asymmetric key treated as an HMAC secret).
+    decoded = jwt.verify(token, env.JWT_SECRET, {
+      algorithms: ['HS256'],
+    }) as jwt.JwtPayload;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       res.status(401).json({ status: 'error', message: 'Token expired' });
@@ -36,17 +43,32 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
     return;
   }
 
+  const userId = Number(decoded.userId);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    res.status(401).json({ status: 'error', message: 'Invalid token' });
+    return;
+  }
+
+  // Re-read the account so a deactivated, locked or deleted user loses access
+  // immediately, and so role_id comes from the database rather than the token
+  // (a demoted user must not keep admin powers for the rest of the token's life).
+  const account = await userRepo.findActiveAuthContext(userId);
+  if (!account) {
+    res.status(401).json({ status: 'error', message: 'Account is inactive or no longer exists' });
+    return;
+  }
+
   let permissions: string[] = [];
   try {
-    permissions = await userRepo.getUserPermissions(decoded.userId);
+    permissions = await userRepo.getUserPermissions(userId);
   } catch {
     permissions = [];
   }
 
   req.user = {
-    userId: decoded.userId,
-    username: decoded.username,
-    role_id: decoded.role_id,
+    userId: account.id,
+    username: account.username,
+    role_id: account.role_id,
     permissions,
   };
 
@@ -60,7 +82,7 @@ export function authorize(...requiredPermissions: string[]) {
       return;
     }
 
-    if (req.user.role_id === 1 || req.user.role_id === 2) {
+    if (SUPER_ADMIN_ROLE_IDS.has(req.user.role_id)) {
       next();
       return;
     }

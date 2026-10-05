@@ -1,3 +1,11 @@
+/** Mirrors sale_returns.status ENUM('completed','cancelled') in 005_create_transaction_tables.sql */
+export type SaleReturnStatus = 'completed' | 'cancelled';
+
+/** Mirrors sale_returns.refund_method ENUM('cash','card','credit','exchange') */
+export type RefundMethod = 'cash' | 'card' | 'credit' | 'exchange';
+
+export const VALID_REFUND_METHODS: RefundMethod[] = ['cash', 'card', 'credit', 'exchange'];
+
 export interface SaleReturn {
   id: number;
   return_number: string;
@@ -6,9 +14,9 @@ export interface SaleReturn {
   user_id: number;
   subtotal: number;
   total_amount: number;
-  refund_method: 'cash' | 'card' | 'credit';
+  refund_method: RefundMethod;
   reason: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: SaleReturnStatus;
   created_at: Date;
 }
 
@@ -17,7 +25,8 @@ export interface SaleReturnItem {
   sale_return_id: number;
   sale_item_id: number;
   medicine_id: number;
-  batch_id: number | null;
+  /** NOT NULL in the schema; always derived from the referenced sale_items row. */
+  batch_id: number;
   quantity: number;
   unit_price: number;
   total: number;
@@ -26,14 +35,17 @@ export interface SaleReturnItem {
 export interface CreateSaleReturnDTO {
   sale_id: number;
   customer_id?: number | null;
+  /**
+   * Only `sale_item_id` and `quantity` are trusted from the client.
+   * `medicine_id`, `batch_id` and `unit_price` are always read from the
+   * referenced `sale_items` row so a client cannot restock an unrelated batch
+   * or choose its own refund amount.
+   */
   items: {
     sale_item_id: number;
-    medicine_id: number;
-    batch_id?: number | null;
     quantity: number;
-    unit_price: number;
   }[];
-  refund_method: 'cash' | 'card' | 'credit';
+  refund_method: RefundMethod;
   reason?: string;
 }
 

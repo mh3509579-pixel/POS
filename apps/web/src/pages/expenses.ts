@@ -29,7 +29,7 @@ interface ExpenseCategory {
 
 type ExpensesTab = 'list' | 'categories' | 'reports';
 
-let expenseCategories: ExpenseCategory[] = [];
+const expenseCategories: ExpenseCategory[] = [];
 let expenses: Expense[] = [];
 let currentTab: ExpensesTab = 'list';
 

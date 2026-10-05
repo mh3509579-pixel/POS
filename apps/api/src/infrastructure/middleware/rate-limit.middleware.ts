@@ -1,16 +1,25 @@
 import { Request, Response, NextFunction } from 'express';
 
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
 }
 
-const store: RateLimitStore = {};
+const store = new Map<string, RateLimitEntry>();
+
+/**
+ * Rate limiting is controlled by an explicit opt-out rather than by NODE_ENV.
+ *
+ * The previous check (`NODE_ENV === 'development'`) disabled all rate limiting
+ * whenever NODE_ENV was unset, and env.ts defaults NODE_ENV to 'development',
+ * so any deployment that forgot to set the variable had no protection at all.
+ */
+function isRateLimitDisabled(): boolean {
+  return process.env.DISABLE_RATE_LIMIT === 'true';
+}
 
 export function clearRateLimitStore(): void {
-  Object.keys(store).forEach((key) => delete store[key]);
+  store.clear();
 }
 
 export interface RateLimitOptions {
@@ -27,30 +36,41 @@ export function createRateLimit(options: RateLimitOptions = {}) {
   } = options;
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (process.env.NODE_ENV === 'development') {
+    if (isRateLimitDisabled()) {
       next();
       return;
     }
 
-    const key = req.ip || req.connection.remoteAddress || 'unknown';
     const now = Date.now();
 
-    if (!store[key] || now > store[key].resetTime) {
-      store[key] = {
-        count: 1,
-        resetTime: now + windowMs,
-      };
+    // Opportunistic eviction so the in-memory store cannot grow without bound.
+    if (store.size > 10000) {
+      for (const [key, entry] of store) {
+        if (now > entry.resetTime) store.delete(key);
+      }
+    }
+
+    // Key authenticated users by id so one busy terminal cannot exhaust the
+    // quota for everyone behind the same NAT/proxy IP.
+    const authUser = (req as Request & { user?: { userId?: number } }).user;
+    const key =
+      authUser?.userId != null
+        ? `u:${authUser.userId}`
+        : `ip:${req.ip || req.socket.remoteAddress || 'unknown'}`;
+
+    const entry = store.get(key);
+
+    if (!entry || now > entry.resetTime) {
+      store.set(key, { count: 1, resetTime: now + windowMs });
       next();
       return;
     }
 
-    store[key].count++;
+    entry.count++;
 
-    if (store[key].count > max) {
-      res.status(429).json({
-        status: 'error',
-        message,
-      });
+    if (entry.count > max) {
+      res.setHeader('Retry-After', Math.ceil((entry.resetTime - now) / 1000));
+      res.status(429).json({ status: 'error', message });
       return;
     }
 
@@ -66,6 +86,6 @@ export const apiRateLimit = createRateLimit({
 
 export const authRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
+  max: 20,
   message: 'Too many login attempts, please try again later.',
 });

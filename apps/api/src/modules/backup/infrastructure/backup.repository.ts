@@ -1,28 +1,41 @@
 import { BackupRecord, CreateBackupDTO } from '../domain/backup.entity.js';
 import { query, queryOne, execute } from '../../../infrastructure/database/connection.js';
 
+const METADATA_COLUMNS = `id, backup_number, backup_type, status, file_path, file_size, created_by, created_at`;
+
 export class BackupRepository {
+  /**
+   * Metadata only. `notes` holds the full JSON dump of every table including
+   * users.password_hash, so it must never appear in an API response.
+   */
   async findById(id: number): Promise<BackupRecord | null> {
+    return queryOne<BackupRecord>(`SELECT ${METADATA_COLUMNS} FROM backups WHERE id = ?`, [id]);
+  }
+
+  /** Internal only: includes the dump, so restore and download can read it. */
+  async findWithPayload(id: number): Promise<BackupRecord | null> {
     return queryOne<BackupRecord>('SELECT * FROM backups WHERE id = ?', [id]);
   }
 
   async findAll(limit: number = 50, offset: number = 0): Promise<BackupRecord[]> {
+    // `notes` holds the full JSON dump of every table, including users.password_hash.
+    // Returning it from the list endpoint handed credentials to anyone with
+    // backup.view without even calling /download.
     return query<BackupRecord[]>(
-      'SELECT * FROM backups ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      `SELECT ${METADATA_COLUMNS} FROM backups ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       [limit, offset]
     );
   }
 
   async create(data: CreateBackupDTO, userId: number, filePath?: string, fileSize?: number): Promise<BackupRecord> {
     const result = await execute(
-      `INSERT INTO backups (backup_number, backup_type, status, file_path, file_size, notes, created_by)
-       VALUES (?, ?, 'completed', ?, ?, ?, ?)`,
+      `INSERT INTO backups (backup_number, backup_type, status, file_path, file_size, created_by)
+       VALUES (?, ?, 'pending', ?, ?, ?)`,
       [
         `BK-${Date.now()}`,
         data.backup_type,
         filePath || null,
-        fileSize || null,
-        data.notes || null,
+        fileSize ?? null,
         userId,
       ]
     );
@@ -58,7 +71,7 @@ export class BackupRepository {
 
   async getLatest(): Promise<BackupRecord | null> {
     return queryOne<BackupRecord>(
-      'SELECT * FROM backups WHERE status = ? ORDER BY created_at DESC LIMIT 1',
+      `SELECT ${METADATA_COLUMNS} FROM backups WHERE status = ? ORDER BY created_at DESC LIMIT 1`,
       ['completed']
     );
   }

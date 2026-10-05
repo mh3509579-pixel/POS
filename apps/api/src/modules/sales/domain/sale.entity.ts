@@ -44,7 +44,8 @@ export interface CreateSaleDTO {
 
 export interface CreateSaleItemDTO {
   medicine_id: number;
-  batch_number: string;
+  /** Optional. When omitted the batch is auto-selected FEFO (earliest unexpired expiry). */
+  batch_number?: string;
   quantity: number;
   unit_price: number;
   discount?: number;

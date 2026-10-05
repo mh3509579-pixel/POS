@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { ExpenseService } from '../application/expense.service.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const expenseService = new ExpenseService();
 
 export async function createExpense(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = (req as any).user?.userId || 1;
+    const userId = requireUserId(req as any);
     const expense = await expenseService.createExpense(req.body, userId);
     res.status(201).json({ status: 'success', data: expense });
   } catch (error) {
@@ -41,8 +42,7 @@ export async function getExpenseByNumber(req: Request, res: Response, next: Next
 
 export async function getAllExpenses(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const expenses = await expenseService.getAllExpenses(limit, offset);
     res.json({ status: 'success', data: expenses });
   } catch (error) {

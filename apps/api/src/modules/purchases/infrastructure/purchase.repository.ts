@@ -1,5 +1,14 @@
 import { Purchase, PurchaseItem, CreatePurchaseDTO, PurchaseWithItems } from '../domain/purchase.entity.js';
-import { query, queryOne, execute, beginTransaction, commitTransaction, rollbackTransaction } from '../../../infrastructure/database/connection.js';
+import {
+  query,
+  queryOne,
+  execute,
+  withTransaction,
+  TransactionContext,
+} from '../../../infrastructure/database/connection.js';
+import { validatePurchaseDTO } from '../domain/purchase.rules.js';
+import { round2 } from '../../sales/domain/sale.rules.js';
+import { toDateOnly, nextDateOnly } from '../../../infrastructure/utils/date.js';
 
 export class PurchaseRepository {
   async findById(id: number): Promise<PurchaseWithItems | null> {
@@ -140,114 +149,129 @@ export class PurchaseRepository {
   }
 
   async create(data: CreatePurchaseDTO, userId: number): Promise<PurchaseWithItems> {
-    const connection = await beginTransaction();
+    const dto = validatePurchaseDTO(data);
 
-    try {
-      const purchaseNumber = await this.getNextPurchaseNumber();
-      const paymentNumber = await this.getNextPaymentNumber();
+    const subtotal = round2(dto.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0));
+    const discount = round2(dto.discount || 0);
+    const tax = round2((subtotal - discount) * (dto.tax_rate ?? 0));
+    const total = round2(subtotal - discount + tax);
 
-      const subtotal = data.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-      const discount = data.discount || 0;
-      const taxable = subtotal - discount;
-      const taxRate = data.tax_rate || 0;
-      const tax = taxable * taxRate;
-      const total = taxable + tax;
+    const purchaseId = await withTransaction(async (tx) => {
+      const purchaseNumber = await this.getNextPurchaseNumber(tx);
+      const paymentNumber = await this.getNextPaymentNumber(tx);
 
-      const purchaseResult = await execute(
-        `INSERT INTO purchases (purchase_number, supplier_id, user_id, invoice_ref, subtotal, discount_amount, tax_amount, total_amount, status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', ?)`,
+      const purchaseResult = await tx.execute(
+        `INSERT INTO purchases (purchase_number, supplier_id, user_id, invoice_ref, subtotal, discount_amount, tax_amount, total_amount, payment_status, status, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'received', ?)`,
         [
           purchaseNumber,
-          data.supplier_id,
+          dto.supplier_id,
           userId,
-          data.invoice_number || null,
+          dto.invoice_number || null,
           subtotal,
           discount,
           tax,
           total,
-          data.notes || null,
+          dto.notes || null,
         ]
       );
 
-      const purchaseId = purchaseResult.insertId;
+      const newPurchaseId = purchaseResult.insertId;
 
-      if (data.supplier_id) {
-        await execute(
+      if (dto.supplier_id) {
+        await tx.execute(
           `INSERT INTO payments (payment_number, payment_type, entity_type, entity_id, amount, payment_method, reference_type, reference_id, user_id, notes)
            VALUES (?, 'payable', 'supplier', ?, ?, ?, 'purchase', ?, ?, ?)`,
           [
             paymentNumber,
-            data.supplier_id,
+            dto.supplier_id,
             total,
-            'bank_transfer',
-            purchaseId,
+            'credit',
+            newPurchaseId,
             userId,
             `Payment for ${purchaseNumber}`,
           ]
         );
       }
 
-      for (const item of data.items) {
-        const itemTotal = item.unit_price * item.quantity;
-        await execute(
-          `INSERT INTO purchase_items (purchase_id, medicine_id, batch_number, expiry_date, quantity, purchase_price, sale_price, total)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [purchaseId, item.medicine_id, item.batch_number, item.expiry_date, item.quantity, item.unit_price, item.sale_price, itemTotal]
-        );
+      for (const item of dto.items) {
+        // Resolve (or create) the batch *before* inserting the item so
+        // purchase_items.batch_id is populated. It used to always stay NULL,
+        // which forced purchase returns to trust a client-supplied batch id.
+        let batchId: number;
 
-        const existingBatch = await queryOne<{ id: number }>(
-          'SELECT id FROM medicine_batches WHERE medicine_id = ? AND batch_number = ?',
+        const existingBatch = await tx.queryOne<{ id: number }>(
+          'SELECT id FROM medicine_batches WHERE medicine_id = ? AND batch_number = ? FOR UPDATE',
           [item.medicine_id, item.batch_number]
         );
 
         if (existingBatch) {
-          await execute(
-            'UPDATE medicine_batches SET quantity = quantity + ?, expiry_date = ? WHERE id = ?',
-            [item.quantity, item.expiry_date, existingBatch.id]
+          batchId = existingBatch.id;
+
+          // Only add quantity here. Rewriting expiry_date on re-receipt used to
+          // silently corrupt the stored expiry (and FEFO ordering) of an
+          // existing batch while leaving its prices stale.
+          await tx.execute(
+            'UPDATE medicine_batches SET quantity = quantity + ? WHERE id = ?',
+            [item.quantity, batchId]
           );
         } else {
-          await execute(
+          const insertBatch = await tx.execute(
             `INSERT INTO medicine_batches (medicine_id, batch_number, expiry_date, quantity, purchase_price, sale_price)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [item.medicine_id, item.batch_number, item.expiry_date, item.quantity, item.unit_price, item.sale_price]
           );
+          batchId = insertBatch.insertId;
         }
 
-        const batch = await queryOne<{ id: number }>(
-          'SELECT id FROM medicine_batches WHERE medicine_id = ? AND batch_number = ?',
-          [item.medicine_id, item.batch_number]
+        const itemTotal = round2(item.unit_price * item.quantity);
+
+        await tx.execute(
+          `INSERT INTO purchase_items (purchase_id, medicine_id, batch_id, batch_number, expiry_date, quantity, purchase_price, sale_price, total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newPurchaseId,
+            item.medicine_id,
+            batchId,
+            item.batch_number,
+            item.expiry_date,
+            item.quantity,
+            item.unit_price,
+            item.sale_price,
+            itemTotal,
+          ]
         );
 
-        if (batch) {
-          await execute(
-            `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
-             VALUES (?, ?, 'purchase', ?, 'purchase', ?, ?, ?)`,
-            [item.medicine_id, batch.id, item.quantity, purchaseId, userId, `Purchase #${purchaseNumber}`]
-          );
-        }
+        await tx.execute(
+          `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
+           VALUES (?, ?, 'purchase', ?, 'purchase', ?, ?, ?)`,
+          [item.medicine_id, batchId, item.quantity, newPurchaseId, userId, `Purchase #${purchaseNumber}`]
+        );
       }
 
-      await execute(
+      await tx.execute(
         'UPDATE suppliers SET current_balance = current_balance + ? WHERE id = ?',
-        [total, data.supplier_id]
+        [total, dto.supplier_id]
       );
 
-      await commitTransaction(connection);
+      return newPurchaseId;
+    });
 
-      return this.findById(purchaseId) as Promise<PurchaseWithItems>;
-    } catch (error) {
-      await rollbackTransaction(connection);
-      throw error;
-    }
+    return this.findById(purchaseId) as Promise<PurchaseWithItems>;
   }
 
-  async getNextPurchaseNumber(): Promise<string> {
+  async getNextPurchaseNumber(tx?: TransactionContext): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `PO-${year}-`;
-    const last = await queryOne<{ purchase_number: string }>(
-      "SELECT purchase_number FROM purchases WHERE purchase_number LIKE ? ORDER BY id DESC LIMIT 1",
-      [`${prefix}%`]
-    );
+    const last = tx
+      ? await tx.queryOne<{ purchase_number: string }>(
+          "SELECT purchase_number FROM purchases WHERE purchase_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE",
+          [`${prefix}%`]
+        )
+      : await queryOne<{ purchase_number: string }>(
+          "SELECT purchase_number FROM purchases WHERE purchase_number LIKE ? ORDER BY id DESC LIMIT 1",
+          [`${prefix}%`]
+        );
 
     if (!last) {
       return `${prefix}000001`;
@@ -257,13 +281,18 @@ export class PurchaseRepository {
     return `${prefix}${String(seq).padStart(6, '0')}`;
   }
 
-  async getNextPaymentNumber(): Promise<string> {
+  async getNextPaymentNumber(tx?: TransactionContext): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `PAY-PO-${year}-`;
-    const last = await queryOne<{ payment_number: string }>(
-      "SELECT payment_number FROM payments WHERE payment_number LIKE ? ORDER BY id DESC LIMIT 1",
-      [`${prefix}%`]
-    );
+    const last = tx
+      ? await tx.queryOne<{ payment_number: string }>(
+          "SELECT payment_number FROM payments WHERE payment_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE",
+          [`${prefix}%`]
+        )
+      : await queryOne<{ payment_number: string }>(
+          "SELECT payment_number FROM payments WHERE payment_number LIKE ? ORDER BY id DESC LIMIT 1",
+          [`${prefix}%`]
+        );
 
     if (!last) {
       return `${prefix}000001`;
@@ -274,10 +303,11 @@ export class PurchaseRepository {
   }
 
   async getDailyPurchases(date: Date): Promise<{ total_purchases: number; total_amount: number }> {
+    const day = toDateOnly(date);
     const result = await queryOne<{ total_purchases: number; total_amount: number }>(
-      `SELECT COUNT(*) as total_purchases, COALESCE(SUM(total_amount), 0) as total_amount 
-       FROM purchases WHERE DATE(created_at) = ? AND status = 'received'`,
-      [date]
+      `SELECT COUNT(*) as total_purchases, COALESCE(SUM(total_amount), 0) as total_amount
+       FROM purchases WHERE created_at >= ? AND created_at < ? AND status = 'received'`,
+      [day, nextDateOnly(day)]
     );
     return result || { total_purchases: 0, total_amount: 0 };
   }

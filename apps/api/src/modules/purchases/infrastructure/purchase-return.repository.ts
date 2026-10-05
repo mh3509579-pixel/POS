@@ -1,15 +1,20 @@
 import { CreatePurchaseReturnDTO, PurchaseReturnWithItems } from '../domain/purchase-return.entity.js';
-import { query, queryOne, execute, beginTransaction, commitTransaction, rollbackTransaction } from '../../../infrastructure/database/connection.js';
-import mysql from 'mysql2/promise';
+import { query, queryOne, withTransaction, TransactionContext } from '../../../infrastructure/database/connection.js';
+import { round2, ValidationError, ConflictError } from '../../sales/domain/sale.rules.js';
 
 export class PurchaseReturnRepository {
-  async generateReturnNumber(): Promise<string> {
+  async generateReturnNumber(tx?: TransactionContext): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `RET-PO-${year}-`;
-    const last = await queryOne<{ return_number: string }>(
-      "SELECT return_number FROM purchase_returns WHERE return_number LIKE ? ORDER BY id DESC LIMIT 1",
-      [`${prefix}%`]
-    );
+    const last = tx
+      ? await tx.queryOne<{ return_number: string }>(
+          "SELECT return_number FROM purchase_returns WHERE return_number LIKE ? ORDER BY id DESC LIMIT 1 FOR UPDATE",
+          [`${prefix}%`]
+        )
+      : await queryOne<{ return_number: string }>(
+          "SELECT return_number FROM purchase_returns WHERE return_number LIKE ? ORDER BY id DESC LIMIT 1",
+          [`${prefix}%`]
+        );
 
     if (!last) {
       return `${prefix}000001`;
@@ -20,19 +25,127 @@ export class PurchaseReturnRepository {
   }
 
   async create(data: CreatePurchaseReturnDTO, userId: number): Promise<PurchaseReturnWithItems> {
-    const connection = await beginTransaction();
+    const purchaseReturnId = await withTransaction(async (tx) => {
+      const purchase = await tx.queryOne<{ id: number; supplier_id: number; status: string }>(
+        'SELECT id, supplier_id, status FROM purchases WHERE id = ? FOR UPDATE',
+        [data.purchase_id]
+      );
 
-    try {
-      const returnNumber = await this.generateReturnNumber();
-      const totalAmount = data.items.reduce((sum, item) => sum + (item.purchase_price * item.quantity), 0);
+      if (!purchase) {
+        throw new ValidationError(`Purchase ${data.purchase_id} not found`);
+      }
 
-      const result = await execute(
+      if (purchase.status === 'cancelled') {
+        throw new ConflictError('A cancelled purchase cannot be returned');
+      }
+
+      const returnNumber = await this.generateReturnNumber(tx);
+
+      // Resolve every line against the real purchase_items row so medicine_id,
+      // batch_id and purchase_price cannot be spoofed by the client.
+      const resolved: {
+        purchase_item_id: number;
+        medicine_id: number;
+        batch_id: number;
+        quantity: number;
+        purchase_price: number;
+        total: number;
+      }[] = [];
+
+      const seen = new Map<number, number>();
+
+      for (const [index, raw] of data.items.entries()) {
+        const purchaseItemId = Number(raw?.purchase_item_id);
+        if (!Number.isInteger(purchaseItemId) || purchaseItemId <= 0) {
+          throw new ValidationError(`items[${index}].purchase_item_id must be a positive integer`);
+        }
+
+        const quantity = Number(raw?.quantity);
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw new ValidationError(`items[${index}].quantity must be a whole number greater than zero`);
+        }
+
+        const purchaseItem = await tx.queryOne<{
+          id: number;
+          medicine_id: number;
+          batch_id: number | null;
+          quantity: number;
+          purchase_price: string | number;
+        }>(
+          `SELECT id, medicine_id, batch_id, quantity, purchase_price
+           FROM purchase_items WHERE id = ? AND purchase_id = ? FOR UPDATE`,
+          [purchaseItemId, data.purchase_id]
+        );
+
+        if (!purchaseItem) {
+          throw new ValidationError(
+            `Purchase item ${purchaseItemId} does not belong to purchase ${data.purchase_id}`
+          );
+        }
+
+        if (!purchaseItem.batch_id) {
+          throw new ConflictError(
+            `Purchase item ${purchaseItemId} has no batch recorded; stock cannot be returned safely`
+          );
+        }
+
+        const previouslyReturned = await tx.queryOne<{ returned: number }>(
+          `SELECT COALESCE(SUM(pri.quantity), 0) as returned
+           FROM purchase_return_items pri
+           JOIN purchase_returns pr ON pri.purchase_return_id = pr.id
+           WHERE pri.purchase_item_id = ? AND pr.status = 'completed'`,
+          [purchaseItemId]
+        );
+
+        const alreadyThisRequest = seen.get(purchaseItemId) ?? 0;
+        const returnedSoFar = Number(previouslyReturned?.returned ?? 0) + alreadyThisRequest;
+        const purchased = Number(purchaseItem.quantity);
+
+        if (returnedSoFar + quantity > purchased) {
+          throw new ConflictError(
+            `Cannot return ${quantity} of purchase item ${purchaseItemId}: only ${purchased - returnedSoFar} of ${purchased} remain returnable`
+          );
+        }
+
+        seen.set(purchaseItemId, alreadyThisRequest + quantity);
+
+        const batch = await tx.queryOne<{ id: number; quantity: number }>(
+          'SELECT id, quantity FROM medicine_batches WHERE id = ? FOR UPDATE',
+          [purchaseItem.batch_id]
+        );
+
+        if (!batch) {
+          throw new ConflictError(`Batch ${purchaseItem.batch_id} no longer exists`);
+        }
+
+        if (Number(batch.quantity) < quantity) {
+          throw new ConflictError(
+            `Insufficient batch quantity. Available: ${batch.quantity}, requested: ${quantity}`
+          );
+        }
+
+        const purchasePrice = Number(purchaseItem.purchase_price ?? 0);
+
+        resolved.push({
+          purchase_item_id: purchaseItem.id,
+          medicine_id: purchaseItem.medicine_id,
+          batch_id: purchaseItem.batch_id,
+          quantity,
+          purchase_price: purchasePrice,
+          total: round2(purchasePrice * quantity),
+        });
+      }
+
+      const totalAmount = round2(resolved.reduce((sum, line) => sum + line.total, 0));
+      const supplierId = data.supplier_id ?? purchase.supplier_id ?? null;
+
+      const result = await tx.execute(
         `INSERT INTO purchase_returns (return_number, purchase_id, supplier_id, user_id, total_amount, refund_method, reason, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'completed')`,
         [
           returnNumber,
           data.purchase_id,
-          data.supplier_id || null,
+          supplierId,
           userId,
           totalAmount,
           data.refund_method,
@@ -40,57 +153,53 @@ export class PurchaseReturnRepository {
         ]
       );
 
-      const purchaseReturnId = result.insertId;
+      const newPurchaseReturnId = result.insertId;
 
-      for (const item of data.items) {
-        const itemTotal = item.purchase_price * item.quantity;
-        await execute(
+      for (const line of resolved) {
+        await tx.execute(
           `INSERT INTO purchase_return_items (purchase_return_id, purchase_item_id, medicine_id, batch_id, quantity, purchase_price, total)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [purchaseReturnId, item.purchase_item_id, item.medicine_id, item.batch_id || null, item.quantity, item.purchase_price, itemTotal]
+          [
+            newPurchaseReturnId,
+            line.purchase_item_id,
+            line.medicine_id,
+            line.batch_id,
+            line.quantity,
+            line.purchase_price,
+            line.total,
+          ]
         );
 
-        if (item.batch_id) {
-          const batch = await queryOne<{ id: number; quantity: number }>(
-            'SELECT id, quantity FROM medicine_batches WHERE id = ?',
-            [item.batch_id]
-          );
+        await tx.execute('UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?', [
+          line.quantity,
+          line.batch_id,
+        ]);
 
-          if (!batch) {
-            throw new Error(`Batch with id ${item.batch_id} not found`);
-          }
-
-          if (batch.quantity < item.quantity) {
-            throw new Error(`Insufficient batch quantity. Available: ${batch.quantity}, Requested: ${item.quantity}`);
-          }
-
-          await execute(
-            'UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?',
-            [item.quantity, item.batch_id]
-          );
-
-          await execute(
-            `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
-             VALUES (?, ?, 'purchase_return', ?, 'purchase_return', ?, ?, ?)`,
-            [item.medicine_id, item.batch_id, -item.quantity, purchaseReturnId, userId, `Purchase Return #${returnNumber}`]
-          );
-        }
+        await tx.execute(
+          `INSERT INTO stock_movements (medicine_id, batch_id, movement_type, quantity, reference_type, reference_id, user_id, notes)
+           VALUES (?, ?, 'purchase_return', ?, 'purchase_return', ?, ?, ?)`,
+          [
+            line.medicine_id,
+            line.batch_id,
+            -line.quantity,
+            newPurchaseReturnId,
+            userId,
+            `Purchase Return #${returnNumber}`,
+          ]
+        );
       }
 
-      if (data.supplier_id) {
-        await execute(
+      if (supplierId) {
+        await tx.execute(
           'UPDATE suppliers SET current_balance = current_balance - ? WHERE id = ?',
-          [totalAmount, data.supplier_id]
+          [totalAmount, supplierId]
         );
       }
 
-      await commitTransaction(connection);
+      return newPurchaseReturnId;
+    });
 
-      return this.findById(purchaseReturnId) as Promise<PurchaseReturnWithItems>;
-    } catch (error) {
-      await rollbackTransaction(connection);
-      throw error;
-    }
+    return this.findById(purchaseReturnId) as Promise<PurchaseReturnWithItems>;
   }
 
   async findById(id: number): Promise<PurchaseReturnWithItems | null> {

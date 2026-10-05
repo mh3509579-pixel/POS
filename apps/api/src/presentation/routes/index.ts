@@ -14,12 +14,10 @@ import { inventoryRoutes } from '../../modules/inventory/presentation/inventory.
 import { auditRoutes } from '../../modules/audit/presentation/audit.routes.js';
 import { settingsRoutes } from '../../modules/settings/presentation/settings.routes.js';
 import { reportsRoutes } from '../../modules/reports/presentation/reports.routes.js';
-import { demoRoutes } from './demo.routes.js';
 
 const routes = Router();
 
 routes.use(healthRoutes);
-routes.use('/demo', demoRoutes);
 routes.use('/auth', authRoutes);
 routes.use('/medicines', medicinesRoutes);
 routes.use('/customers', customersRoutes);

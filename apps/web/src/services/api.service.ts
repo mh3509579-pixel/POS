@@ -20,7 +20,7 @@ api.interceptors.response.use(
       console.error('[API Error]', error.response.status, error.response.data);
       if (error.response.status === 401) {
         const requestUrl = error.config?.url || '';
-        const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/demo/demo-login') || requestUrl.includes('/auth/register');
+        const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
         if (!isAuthRequest) {
           const hadToken = localStorage.getItem('auth_token');
           localStorage.removeItem('auth_token');

@@ -28,6 +28,7 @@ export async function logAudit(data: AuditLogData): Promise<void> {
       ]
     );
   } catch (error) {
+    // Audit failures must never fail the business operation that triggered them.
     console.error('Audit log error:', error);
   }
 }

@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { SaleService } from '../application/sale.service.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const saleService = new SaleService();
 
 export async function createSale(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = (req as any).user?.userId || 1;
+    const userId = requireUserId(req as any);
     const sale = await saleService.createSale(req.body, userId);
     res.status(201).json({ status: 'success', data: sale });
   } catch (error) {
@@ -41,8 +42,7 @@ export async function getSaleByInvoice(req: Request, res: Response, next: NextFu
 
 export async function getAllSales(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const sales = await saleService.getAllSales(limit, offset);
     res.json({ status: 'success', data: sales });
   } catch (error) {

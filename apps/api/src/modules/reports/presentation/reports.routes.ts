@@ -1,9 +1,53 @@
-import { Router, Request, Response } from 'express';
-import { authenticate } from '../../../infrastructure/middleware/auth.middleware.js';
+import { Router, Request, Response, NextFunction } from 'express';
+import { authenticate, authorize } from '../../../infrastructure/middleware/auth.middleware.js';
 import { getPool } from '../../../infrastructure/database/connection.js';
+import { parseQueryDate } from '../../../infrastructure/utils/date.js';
 
 const router = Router();
 router.use(authenticate);
+
+// Financial data must not be readable by every authenticated user.
+router.use(authorize('reports.view', 'accounting.reports', 'accounting.view'));
+
+const MAX_RANGE_DAYS = 366 * 5;
+
+/**
+ * Rejects malformed, inverted, or unbounded date ranges up front instead of
+ * letting `new Date('abc')` produce an Invalid Date (which surfaced as a 500)
+ * or scanning the whole table.
+ */
+function validateReportDateRange(req: Request, res: Response, next: NextFunction): void {
+  const rawStart = req.query.start_date;
+  const rawEnd = req.query.end_date;
+
+  const start = parseQueryDate(rawStart) ?? new Date(new Date().getFullYear(), 0, 1);
+  const end = parseQueryDate(rawEnd) ?? new Date();
+
+  if ((rawStart !== undefined && rawStart !== '' && !parseQueryDate(rawStart)) ||
+      (rawEnd !== undefined && rawEnd !== '' && !parseQueryDate(rawEnd))) {
+    res.status(400).json({ status: 'error', message: 'start_date and end_date must be valid dates' });
+    return;
+  }
+
+  if (end.getTime() < start.getTime()) {
+    res.status(400).json({ status: 'error', message: 'end_date must not be earlier than start_date' });
+    return;
+  }
+
+  const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  if (days > MAX_RANGE_DAYS) {
+    res.status(400).json({ status: 'error', message: `Date range must not exceed ${MAX_RANGE_DAYS} days` });
+    return;
+  }
+
+  // Reuse the validated values downstream.
+  req.query.start_date = start.toISOString();
+  req.query.end_date = end.toISOString();
+
+  next();
+}
+
+router.use(validateReportDateRange);
 
 router.get('/reports/sales', async (req: Request, res: Response) => {
   try {

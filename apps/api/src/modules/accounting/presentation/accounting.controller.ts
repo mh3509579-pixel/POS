@@ -3,6 +3,7 @@ import { AccountRepository } from '../infrastructure/account.repository.js';
 import { JournalEntryRepository } from '../infrastructure/journal-entry.repository.js';
 import { GeneralLedgerRepository } from '../infrastructure/general-ledger.repository.js';
 import { AccountingService } from '../application/accounting.service.js';
+import { parsePagination } from '../../../infrastructure/utils/pagination.js';
 
 const accountRepo = new AccountRepository();
 const journalEntryRepo = new JournalEntryRepository();
@@ -57,8 +58,7 @@ export async function updateAccount(req: Request, res: Response, next: NextFunct
 // Journal Entry Controllers
 export async function getAllJournalEntries(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const entries = await journalEntryRepo.findAll(limit, offset);
     const total = await journalEntryRepo.count();
     res.json({ status: 'success', data: entries, total });

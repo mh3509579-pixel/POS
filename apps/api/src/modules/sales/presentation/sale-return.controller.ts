@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { SaleReturnRepository } from '../infrastructure/sale-return.repository.js';
 import { SaleRepository } from '../infrastructure/sale.repository.js';
+import { VALID_REFUND_METHODS, RefundMethod } from '../domain/sale-return.entity.js';
+import { ValidationError } from '../domain/sale.rules.js';
+import { parsePagination, requireUserId } from '../../../infrastructure/utils/pagination.js';
 
 const saleReturnRepo = new SaleReturnRepository();
 const saleRepo = new SaleRepository();
@@ -11,13 +14,21 @@ export async function createSaleReturn(
   next: NextFunction
 ): Promise<void> {
   try {
-    const userId = (req as any).user?.userId || 1;
+    const userId = requireUserId(req as any);
     const { sale_id, items, refund_method, reason, customer_id } = req.body;
 
-    if (!sale_id || !items || !items.length || !refund_method) {
+    if (!sale_id || !Array.isArray(items) || !items.length || !refund_method) {
       res.status(400).json({
         status: 'error',
         message: 'sale_id, items, and refund_method are required',
+      });
+      return;
+    }
+
+    if (!VALID_REFUND_METHODS.includes(refund_method as RefundMethod)) {
+      res.status(400).json({
+        status: 'error',
+        message: `refund_method must be one of: ${VALID_REFUND_METHODS.join(', ')}`,
       });
       return;
     }
@@ -28,21 +39,14 @@ export async function createSaleReturn(
       return;
     }
 
+    // medicine_id / batch_id / unit_price are intentionally ignored here: the
+    // repository re-reads them from sale_items so they cannot be spoofed.
     for (const item of items) {
-      const saleItem = sale.items.find(
-        (si: any) => si.id === item.sale_item_id
-      );
+      const saleItem = sale.items.find((si: any) => si.id === item.sale_item_id);
       if (!saleItem) {
         res.status(400).json({
           status: 'error',
           message: `Sale item ${item.sale_item_id} not found in sale`,
-        });
-        return;
-      }
-      if (item.quantity > saleItem.quantity) {
-        res.status(400).json({
-          status: 'error',
-          message: `Return quantity exceeds original quantity for item ${item.sale_item_id}`,
         });
         return;
       }
@@ -52,7 +56,10 @@ export async function createSaleReturn(
       {
         sale_id,
         customer_id: customer_id ?? sale.customer_id,
-        items,
+        items: items.map((item: any) => ({
+          sale_item_id: item.sale_item_id,
+          quantity: item.quantity,
+        })),
         refund_method,
         reason,
       },
@@ -61,6 +68,10 @@ export async function createSaleReturn(
 
     res.status(201).json({ status: 'success', data: saleReturn });
   } catch (error) {
+    if (error instanceof ValidationError || (error as any)?.statusCode === 400) {
+      res.status(400).json({ status: 'error', message: (error as Error).message });
+      return;
+    }
     next(error);
   }
 }
@@ -71,8 +82,7 @@ export async function getAllSaleReturns(
   next: NextFunction
 ): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const returns = await saleReturnRepo.findAll(limit, offset);
     res.json({ status: 'success', data: returns });
   } catch (error) {

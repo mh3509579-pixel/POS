@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { SupplierRepository } from '../infrastructure/supplier.repository.js';
+import { parsePagination } from '../../../infrastructure/utils/pagination.js';
 
 const supplierRepo = new SupplierRepository();
 
 export async function getAllSuppliers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 100;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit, offset } = parsePagination(req.query.limit, req.query.offset);
     const search = req.query.search as string | undefined;
     const type = req.query.type as string | undefined;
 
@@ -75,7 +75,7 @@ export async function deleteSupplier(req: Request, res: Response, next: NextFunc
 
 export async function getTopSuppliers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const { limit } = parsePagination(req.query.limit, undefined, { limit: 10 });
     const suppliers = await supplierRepo.getTopSuppliers(limit);
     res.json({ status: 'success', data: suppliers });
   } catch (error) {

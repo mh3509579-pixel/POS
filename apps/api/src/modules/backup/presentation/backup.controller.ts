@@ -16,7 +16,7 @@ export async function getAllBackups(_req: Request, res: Response, next: NextFunc
 export async function createBackup(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { backup_type, notes } = req.body;
-    const userId = req.user?.userId || 0;
+    const userId = req.user!.userId;
 
     const backup = await backupService.createBackup({ backup_type, notes }, userId);
     res.status(201).json({ status: 'success', data: backup });
@@ -27,7 +27,7 @@ export async function createBackup(req: AuthRequest, res: Response, next: NextFu
 
 export async function restoreBackup(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number.parseInt(req.params.id, 10);
     await backupService.restoreBackup(id);
     res.json({ status: 'success', message: 'Backup restored successfully' });
   } catch (error) {
@@ -37,7 +37,7 @@ export async function restoreBackup(req: AuthRequest, res: Response, next: NextF
 
 export async function deleteBackup(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number.parseInt(req.params.id, 10);
     const success = await backupService.deleteBackup(id);
     if (!success) {
       res.status(404).json({ status: 'error', message: 'Backup not found' });
