@@ -181,7 +181,7 @@ function createMiniLineChart(values: number[], color: string, width: number = 10
   const areaPoints = `0,${height} ${points} ${width},${height}`;
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+    <svg viewBox="0 0 ${width} ${height}" class="w-100" style="max-width:${width}px;height:auto">
       <defs>
         <linearGradient id="miniGrad${color.replace('#', '')}" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" style="stop-color:${color};stop-opacity:0.3"/>
@@ -227,7 +227,7 @@ function createDonutChart(data: { value: number; color: string }[], size: number
     currentAngle = endAngle;
   });
 
-  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${arcs}</svg>`;
+  return `<svg viewBox="0 0 ${size} ${size}" class="w-100" style="max-width:${size}px;height:auto">${arcs}</svg>`;
 }
 
 export async function renderDashboard(): Promise<string> {

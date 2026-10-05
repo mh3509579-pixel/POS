@@ -280,7 +280,7 @@ function createDonutChart(data: { labels: string[]; values: number[]; colors: st
 
   return `
     <div class="d-flex align-items-center justify-content-center">
-      <svg viewBox="0 0 ${size + 150} ${size}" style="max-height: ${height}px;">
+      <svg viewBox="0 0 ${size + 150} ${size}" class="w-100" style="max-height: ${height}px;height:auto">
         ${arcsSvg}
         ${legendSvg}
       </svg>

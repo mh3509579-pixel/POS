@@ -828,7 +828,11 @@ body {
 /* POS Page */
 .pos-container {
   display: flex;
-  height: calc(100vh - var(--topbar-height));
+  /* 100vh includes the mobile URL bar, which pushed the totals and the
+     Complete Sale button below the fold. dvh tracks the visible viewport. */
+  height: 100vh;
+  height: 100dvh;
+  height: calc(100dvh - var(--topbar-height));
   overflow: hidden;
 }
 
@@ -1822,6 +1826,24 @@ body {
   width: 100%;
 }
 
+/*
+ * Data tables opt into scrolling by making the table itself a scroll container.
+ * Every data table sets `white-space: nowrap` on th/td, so on a phone the
+ * columns are wider than the screen. Previously nothing wrapped them and
+ * `body { overflow-x: hidden }` simply clipped the extra columns, making them
+ * unreachable. `display: block` keeps the internal table layout while letting
+ * the table scroll sideways.
+ */
+@media (max-width: 992px) {
+  .table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Desktop Override: ensure tables have nowrap */
 @media (min-width: 993px) {
   .table-responsive-wrapper {
@@ -1836,6 +1858,10 @@ body {
   .sidebar {
     transform: translateX(-100%);
     z-index: 1000;
+    /* Keep the drawer usable without letting it exceed a narrow viewport. */
+    width: 260px;
+    max-width: 85vw;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
   }
   .sidebar.show {
     transform: translateX(0);
@@ -1879,12 +1905,8 @@ body {
    Mobile: max-width 768px
    =========================== */
 @media (max-width: 768px) {
-  :root {
-    --sidebar-width: 0px;
-  }
   .page-content {
     padding: 1rem !important;
-    overflow-x: hidden;
   }
   body {
     overflow-x: hidden;

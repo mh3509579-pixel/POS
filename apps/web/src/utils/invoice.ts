@@ -54,22 +54,34 @@ export function generateInvoiceHTML(data: InvoiceData): string {
     .header h1 { color: #1a365d; font-size: 24px; margin-bottom: 5px; }
     .header h2 { color: #2d6a4f; font-size: 14px; font-weight: normal; }
     .header p { color: #666; font-size: 11px; margin-top: 5px; }
-    .invoice-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
-    .invoice-info div { flex: 1; }
+    .invoice-info { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; }
+    .invoice-info div { flex: 1; min-width: 0; }
     .invoice-info .label { font-weight: bold; color: #1a365d; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     th { background: #1a365d; color: white; padding: 8px; text-align: left; font-size: 11px; }
     td { padding: 8px; border-bottom: 1px solid #eee; }
     .text-right { text-align: right; }
     .text-center { text-align: center; }
-    .totals { float: right; width: 250px; }
+    .totals { display: flex; justify-content: flex-end; }
+    .totals-inner { width: 250px; max-width: 100%; }
     .totals .row { display: flex; justify-content: space-between; padding: 5px 0; }
     .totals .row.total { border-top: 2px solid #1a365d; font-weight: bold; font-size: 14px; }
     .footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; color: #666; font-size: 10px; }
     .payment-info { background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 15px; }
+    @media screen and (max-width: 600px) {
+      .invoice { padding: 12px; }
+      .invoice-info { flex-direction: column; gap: 10px; }
+      .header h1 { font-size: 18px; }
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      th, td { padding: 6px 4px; font-size: 10px; white-space: nowrap; }
+      .totals-inner { width: 100%; }
+    }
     @media print {
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       .no-print { display: none; }
+      /* The on-screen scroll wrapper must not clip the printed table. */
+      .table-wrap { overflow: visible !important; }
+      th, td { white-space: normal; }
     }
   </style>
 </head>
@@ -96,38 +108,42 @@ export function generateInvoiceHTML(data: InvoiceData): string {
       </div>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Medicine</th>
-          <th>Batch</th>
-          <th class="text-center">Qty</th>
-          <th class="text-right">Price</th>
-          <th class="text-right">Discount</th>
-          <th class="text-right">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemsHTML}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Medicine</th>
+            <th>Batch</th>
+            <th class="text-center">Qty</th>
+            <th class="text-right">Price</th>
+            <th class="text-right">Discount</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHTML}
+        </tbody>
+      </table>
+    </div>
 
     <div class="totals">
-      <div class="row">
-        <span>Subtotal:</span>
-        <span>₨ ${data.subtotal.toFixed(2)}</span>
-      </div>
-      <div class="row">
-        <span>Discount:</span>
-        <span>- ₨ ${data.discount.toFixed(2)}</span>
-      </div>
-      <div class="row">
-        <span>Tax (5%):</span>
-        <span>₨ ${data.tax.toFixed(2)}</span>
-      </div>
-      <div class="row total">
-        <span>Total:</span>
-        <span>₨ ${data.total.toFixed(2)}</span>
+      <div class="totals-inner">
+        <div class="row">
+          <span>Subtotal:</span>
+          <span>₨ ${data.subtotal.toFixed(2)}</span>
+        </div>
+        <div class="row">
+          <span>Discount:</span>
+          <span>- ₨ ${data.discount.toFixed(2)}</span>
+        </div>
+        <div class="row">
+          <span>Tax (5%):</span>
+          <span>₨ ${data.tax.toFixed(2)}</span>
+        </div>
+        <div class="row total">
+          <span>Total:</span>
+          <span>₨ ${data.total.toFixed(2)}</span>
+        </div>
       </div>
     </div>
 

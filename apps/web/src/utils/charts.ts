@@ -183,7 +183,7 @@ export function createDonutChart(data: { labels: string[]; values: number[]; col
 
   return `
     <div class="d-flex align-items-center justify-content-center">
-      <svg viewBox="0 0 ${size + 150} ${size}" style="max-height: ${height}px;">
+      <svg viewBox="0 0 ${size + 150} ${size}" class="w-100" style="max-height: ${height}px;height:auto">
         ${arcsSvg}
         ${legendSvg}
       </svg>
@@ -235,7 +235,7 @@ export function createSparkline(values: number[], color: string, width: number =
   const areaPoints = `0,${height} ${points} ${width},${height}`;
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+    <svg viewBox="0 0 ${width} ${height}" class="w-100" style="max-width:${width}px;height:auto">
       <defs>
         <linearGradient id="sparkGrad${color.replace('#', '')}" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" style="stop-color:${color};stop-opacity:0.3"/>
